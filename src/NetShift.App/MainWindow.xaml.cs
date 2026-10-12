@@ -754,7 +754,7 @@ public partial class MainWindow : Window
                     _legacyDohProxy = new LegacyDohProxy(dohTemplate);
                     _legacyDohEndpoint = dohTemplate;
                 }
-                if (RunElevatedWorker("dns-legacy-apply", adapter.InterfaceIndex.ToString()))
+                if (RunElevatedWorker("dns-legacy-apply", adapter.InterfaceIndex.ToString(), (SupportIPv6CheckBox.IsChecked == true).ToString()))
                 {
                     _legacyAdapterIndex = adapter.InterfaceIndex;
                     _settings.NativeDnsMode = false;

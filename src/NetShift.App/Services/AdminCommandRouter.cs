@@ -79,6 +79,7 @@ public static class AdminCommandRouter
                 case "dns-legacy-apply":
                     if (args.Length < 3 || !int.TryParse(args[2], out interfaceIndex) || interfaceIndex <= 0)
                         throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
+                    var includeIpv6Loopback = args.Length > 3 && bool.TryParse(args[3], out var enableLegacyIpv6) && enableLegacyIpv6;
                     RunPowerShell($"$ErrorActionPreference='Stop'; $i={interfaceIndex}; $a=Get-NetAdapter -InterfaceIndex $i -ErrorAction Stop; " +
                         "$d4=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv4).ServerAddresses); " +
                         "$d6=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv6).ServerAddresses); " +
@@ -90,7 +91,7 @@ public static class AdminCommandRouter
                         "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns'); if($null -ne $native){$backup.SetValue('NativeEnabled',[int]$native.GetValue('Enabled',0),[Microsoft.Win32.RegistryValueKind]::DWord);$backup.SetValue('NativeGuid',[string]$native.GetValue('InterfaceGuid',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeAddresses',[string[]]$native.GetValue('Addresses',@()),[Microsoft.Win32.RegistryValueKind]::MultiString);$backup.SetValue('NativeDoh',[string]$native.GetValue('DohTemplate',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeRevision',[long]$native.GetValue('Revision',0),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
                         "$backup.SetValue('Enabled',1,[Microsoft.Win32.RegistryValueKind]::DWord); $backup.Dispose(); " +
                         "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns',$true); if($null -ne $native){$r=[long]$native.GetValue('Revision',0);$native.SetValue('Enabled',0,[Microsoft.Win32.RegistryValueKind]::DWord);$native.SetValue('Revision',($r+1),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
-                        "Set-DnsClientServerAddress -InterfaceIndex $i -ServerAddresses @('127.0.0.1','::1')");
+                        $"$loopback=@('127.0.0.1'); {(includeIpv6Loopback ? "$loopback+=@('::1');" : string.Empty)} Set-DnsClientServerAddress -InterfaceIndex $i -ServerAddresses $loopback");
                     break;
 
                 case "dns-legacy-restore":
