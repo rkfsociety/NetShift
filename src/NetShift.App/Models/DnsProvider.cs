@@ -2,6 +2,8 @@ namespace NetShift.App.Models;
 
 public sealed record DnsProvider(string Name, string Ipv4, string Ipv6, string? DohTemplate = null)
 {
+    public override string ToString() => Name;
+
     public static DnsProvider DnsAi { get; } = new(
         "DNS-AI",
         "192.144.59.14, 186.246.49.127",
