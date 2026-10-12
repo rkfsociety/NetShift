@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text;
+using System.Xml.Linq;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -121,17 +122,21 @@ internal sealed class DnsProfileWorker(ILogger<DnsProfileWorker> logger) : Backg
 
     private static void RunPowerShell(string command)
     {
-        var script = "$ErrorActionPreference = 'Stop'; try { " + command +
-                     " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
+        var script = "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; " +
+                     "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); " +
+                     "try { $null = & { " + command +
+                     " } } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
         var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         var powershellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
         var startInfo = new ProcessStartInfo(powershellPath)
         {
-            Arguments = $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+            Arguments = $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand {encodedCommand}",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить PowerShell.");
@@ -140,9 +145,30 @@ internal sealed class DnsProfileWorker(ILogger<DnsProfileWorker> logger) : Backg
         process.WaitForExit();
         Task.WaitAll(standardOutput, standardError);
         if (process.ExitCode == 0) return;
-        var detail = standardError.Result.Trim();
-        if (string.IsNullOrWhiteSpace(detail)) detail = standardOutput.Result.Trim();
+        var detail = ExtractPowerShellError(standardError.Result);
+        if (string.IsNullOrWhiteSpace(detail)) detail = ExtractPowerShellError(standardOutput.Result);
         throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail) ? "PowerShell не применил DNS-профиль." : detail);
+    }
+
+    private static string ExtractPowerShellError(string output)
+    {
+        var marker = output.IndexOf("#< CLIXML", StringComparison.Ordinal);
+        if (marker < 0) return output.Trim();
+
+        try
+        {
+            var xml = output[(marker + "#< CLIXML".Length)..].Trim();
+            var document = XDocument.Parse(xml);
+            var message = document.Descendants()
+                .Where(element => element.Name.LocalName == "S" && element.Attribute("S")?.Value == "Error")
+                .Select(element => element.Value.Replace("_x000D__x000A_", Environment.NewLine, StringComparison.Ordinal).Trim())
+                .FirstOrDefault(value => value.Length > 0);
+            return message ?? "Команда PowerShell завершилась с ошибкой.";
+        }
+        catch (System.Xml.XmlException)
+        {
+            return "Не удалось прочитать сообщение об ошибке PowerShell.";
+        }
     }
 
     private static string PsLiteral(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";

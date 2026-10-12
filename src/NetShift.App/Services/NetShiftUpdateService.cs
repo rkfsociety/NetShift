@@ -29,7 +29,7 @@ public static class NetShiftUpdateService
         get
         {
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version?.ToString(3) ?? "0.3.5";
+            return version?.ToString(3) ?? "0.3.6";
         }
     }
 
