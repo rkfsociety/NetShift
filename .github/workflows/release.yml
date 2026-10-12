@@ -1,0 +1,82 @@
+name: Create NetShift release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish self-contained Windows app
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.1.0."
+          }
+
+          $version = $Matches.version
+          $publishDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/publish'
+          New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
+
+          dotnet publish .\src\NetShift.App\NetShift.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output $publishDirectory `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            "-p:Version=$version" `
+            "-p:NetShiftUpdateRepository=$env:GITHUB_REPOSITORY"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'dotnet publish failed.'
+          }
+
+          $executable = Join-Path $publishDirectory 'NetShift.exe'
+          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+            throw 'The publish output does not contain NetShift.exe.'
+          }
+
+          $archiveName = "NetShift-$tag-win-x64.zip"
+          $archivePath = Join-Path $env:GITHUB_WORKSPACE $archiveName
+          $checksumPath = "$archivePath.sha256"
+          Compress-Archive -LiteralPath $executable -DestinationPath $archivePath -CompressionLevel Optimal
+          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText($checksumPath, "$hash  $archiveName`n", [System.Text.UTF8Encoding]::new($false))
+
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_ARCHIVE=$archivePath"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_CHECKSUM=$checksumPath"
+
+      - name: Create GitHub release and upload assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            $env:RELEASE_ARCHIVE `
+            $env:RELEASE_CHECKSUM `
+            --verify-tag `
+            --title "NetShift $env:GITHUB_REF_NAME" `
+            --generate-notes
+          if ($LASTEXITCODE -ne 0) {
+            throw 'GitHub release creation failed.'
+          }

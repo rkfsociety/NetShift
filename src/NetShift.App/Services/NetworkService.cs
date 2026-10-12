@@ -1,0 +1,46 @@
+using System.Net.NetworkInformation;
+using NetShift.App.Models;
+
+namespace NetShift.App.Services;
+
+public static class NetworkService
+{
+    public static IReadOnlyList<NetworkAdapterInfo> GetAdapters()
+    {
+        var adapters = new List<NetworkAdapterInfo>();
+
+        foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces()
+                     .Where(item => item.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                     .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            try
+            {
+                var properties = adapter.GetIPProperties();
+                var interfaceIndex = properties.GetIPv4Properties()?.Index
+                                     ?? properties.GetIPv6Properties()?.Index;
+                if (interfaceIndex is null or <= 0)
+                    continue;
+
+                var dns = properties.DnsAddresses
+                    .Select(address => address.ToString())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                adapters.Add(new NetworkAdapterInfo
+                {
+                    Name = adapter.Name,
+                    Description = adapter.Description,
+                    Status = adapter.OperationalStatus == OperationalStatus.Up ? "Подключён" : "Отключён",
+                    InterfaceIndex = interfaceIndex.Value,
+                    DnsSummary = dns.Length == 0 ? "DNS не назначен" : string.Join("  ·  ", dns)
+                });
+            }
+            catch (NetworkInformationException)
+            {
+                // An adapter can disappear while Windows refreshes its network inventory.
+            }
+        }
+
+        return adapters;
+    }
+}

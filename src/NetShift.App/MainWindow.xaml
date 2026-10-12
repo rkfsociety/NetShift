@@ -1,0 +1,245 @@
+<Window x:Class="NetShift.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NetShift" Width="1060" Height="790" MinWidth="900" MinHeight="680"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource CanvasBrush}"
+        Foreground="{StaticResource TextBrush}">
+  <Grid Margin="30">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" Margin="0,0,0,22">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Border Width="46" Height="46" CornerRadius="14" Background="{StaticResource AccentDarkBrush}" VerticalAlignment="Center">
+        <TextBlock Text="N" Foreground="{StaticResource AccentBrush}" FontSize="25" FontWeight="Bold"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Border>
+      <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+        <TextBlock Text="NetShift" FontSize="22" FontWeight="Bold" />
+        <TextBlock Text="Сеть под контролем" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Width="230" VerticalAlignment="Center" HorizontalAlignment="Right">
+        <TextBlock x:Name="UpdateStatusText" Text="Обновления проверяются при запуске" Foreground="{StaticResource MutedBrush}"
+                   FontSize="10" TextAlignment="Right" TextWrapping="Wrap" />
+        <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
+                Padding="10,6" MinHeight="34" Margin="0,5,0,0" />
+      </StackPanel>
+    </Grid>
+
+    <StackPanel Grid.Row="1" Margin="0,0,0,18">
+      <TextBlock Text="Сеть, которую легко переключить" FontSize="28" FontWeight="SemiBold" />
+      <TextBlock Text="Выберите DNS для адаптера или управляйте локальным пакетом zapret. Для системных действий Windows запросит подтверждение администратора."
+                 Foreground="{StaticResource MutedBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,7,0,0" />
+    </StackPanel>
+
+    <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0" Margin="0,0,0,8">
+      <TabItem Header="DNS">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="2,15,8,12">
+          <StackPanel>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
+              <StackPanel>
+                <Grid Margin="0,0,0,12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="Сетевой адаптер" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="DNS применяется только к выбранному подключению." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Обновить список" Click="RefreshAdapters_Click" Padding="13,7" MinHeight="36" />
+                </Grid>
+                <ComboBox x:Name="AdapterComboBox" SelectionChanged="AdapterComboBox_SelectionChanged" />
+                <TextBlock x:Name="CurrentDnsText" Text="Текущие DNS: загрузка…" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,10,0,0" />
+              </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20">
+              <StackPanel>
+                <Grid Margin="0,0,0,12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="DNS-провайдер" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Можно использовать пресет или ввести свои адреса." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" />
+                  </StackPanel>
+                  <Button x:Name="RefreshDnsAiButton" Grid.Column="1" Content="Обновить DNS-AI" Click="RefreshDnsAi_Click" Padding="12,6" MinHeight="34" />
+                </Grid>
+                <ComboBox x:Name="ProviderComboBox" DisplayMemberPath="Name" SelectionChanged="ProviderComboBox_SelectionChanged" />
+                <Grid Margin="0,15,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="IPv4 DNS" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="1,0,0,7" />
+                    <TextBox x:Name="Ipv4TextBox" ToolTip="Например: 1.1.1.1, 1.0.0.1" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="IPv6 DNS" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="1,0,0,7" />
+                    <TextBox x:Name="Ipv6TextBox" ToolTip="Можно оставить пустым" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock Text="Введите адреса через запятую. Применение заменит список DNS на выбранном интерфейсе."
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,10,0,0" />
+                <CheckBox x:Name="DohEnabledCheckBox" Content="Включить DoH в Windows без возврата к открытому DNS"
+                          IsChecked="False" Margin="1,14,0,7" />
+                <TextBox x:Name="DohTemplateTextBox" IsEnabled="{Binding IsChecked, ElementName=DohEnabledCheckBox}"
+                         ToolTip="Например: https://dns.dns-ai.ru/dns-query" />
+                <TextBlock x:Name="DnsProviderStatusText" Text="DNS-AI: загружаются актуальные настройки сайта…"
+                           Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,17,0,0">
+                  <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="#07151A"
+                          BorderBrush="{StaticResource AccentBrush}" Click="ApplyDns_Click" />
+                  <Button Content="Вернуть DHCP" Margin="10,0,0,0" Click="ResetDns_Click" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="zapret">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="2,15,8,12">
+          <StackPanel>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
+              <StackPanel>
+                <Grid Margin="0,0,0,12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="Пакет zapret" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Скачать последний ZIP из официального GitHub-релиза, проверить SHA-256 и установить в C:\NetShift."
+                               Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,10,0" />
+                  </StackPanel>
+                  <Button x:Name="DownloadLatestButton" Grid.Column="1" Content="Скачать последний релиз"
+                          Background="{StaticResource AccentBrush}" Foreground="#07151A" BorderBrush="{StaticResource AccentBrush}"
+                          Click="DownloadLatest_Click" Padding="14,8" MinHeight="38" />
+                </Grid>
+                <ProgressBar x:Name="DownloadProgressBar" Height="5" Minimum="0" Maximum="100" Visibility="Collapsed" />
+                <TextBlock x:Name="DownloadStatusText" Text="Релиз ещё не проверен" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="2,8,0,12" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="ZapretFolderTextBox" IsReadOnly="True" VerticalContentAlignment="Center" />
+                  <Button Grid.Column="1" Content="Выбрать папку" Click="ChooseZapretFolder_Click" Margin="10,0,0,0" />
+                </Grid>
+                <TextBlock x:Name="ZapretStatusText" Text="Папка zapret не выбрана" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="2,10,0,0" />
+              </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20">
+              <StackPanel>
+                <TextBlock Text="Запуск и служба Windows" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="Можно запустить стратегию вручную или зарегистрировать выбранную стратегию как службу автозапуска."
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,14" />
+                <ComboBox x:Name="StrategyComboBox" />
+                <WrapPanel Margin="0,16,0,0">
+                  <Button x:Name="StartStrategyButton" Content="Запустить стратегию" Background="{StaticResource AccentBrush}" Foreground="#07151A"
+                          BorderBrush="{StaticResource AccentBrush}" Click="StartStrategy_Click" />
+                  <Button x:Name="StopStrategyButton" Content="Остановить ручной запуск" Click="StopStrategy_Click" Margin="8,0,0,0" />
+                  <Button x:Name="InstallServiceButton" Content="Установить службу" Click="InstallService_Click" Margin="8,0,0,0" />
+                  <Button x:Name="StartServiceButton" Content="Запустить службу" Click="StartService_Click" Margin="8,0,0,0" />
+                  <Button x:Name="StopServiceButton" Content="Остановить службу" Click="StopService_Click" Margin="8,0,0,0" />
+                  <Button x:Name="RemoveServiceButton" Content="Удалить службу" Click="RemoveService_Click" Margin="8,0,0,0" />
+                  <Button Content="Обновить статус" Click="RefreshServiceStatus_Click" Margin="8,0,0,0" />
+                </WrapPanel>
+                <TextBlock x:Name="ServiceStatusText" Text="Служба zapret: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,12,0,0" />
+              </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,14,0,0">
+              <StackPanel>
+                <TextBlock Text="Параметры пакета" FontSize="17" FontWeight="SemiBold" />
+                <Grid Margin="0,12,0,0">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="Игровой фильтр" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
+                  <ComboBox x:Name="GameFilterModeComboBox" Grid.Column="1" />
+                  <TextBlock Grid.Row="0" Grid.Column="3" Text="TCP порты" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
+                  <TextBox x:Name="GameFilterTcpTextBox" Grid.Row="1" Grid.Column="3" Margin="0,5,0,0" ToolTip="Например: 1024-65535" />
+                  <TextBlock Grid.Row="0" Grid.Column="5" Text="UDP порты" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
+                  <TextBox x:Name="GameFilterUdpTextBox" Grid.Row="1" Grid.Column="5" Margin="0,5,0,0" ToolTip="Например: 1024-65535" />
+                </Grid>
+                <Grid Margin="0,12,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="IPSet-фильтр" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
+                  <ComboBox x:Name="IpSetModeComboBox" Grid.Column="1" />
+                  <CheckBox x:Name="AutoUpdateCheckBox" Grid.Column="3" Content="Проверять релиз в NetShift перед запуском" VerticalAlignment="Center" />
+                </Grid>
+                <WrapPanel Margin="0,14,0,0">
+                  <Button x:Name="SavePackageSettingsButton" Content="Сохранить параметры" Click="SavePackageSettings_Click" />
+                  <Button Content="Обновить IPSet" Click="UpdateIpSet_Click" Margin="8,0,0,0" />
+                  <Button Content="Проверить новую версию" Click="CheckRelease_Click" Margin="8,0,0,0" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,14,0,0">
+              <StackPanel>
+                <TextBlock Text="Инструменты и диагностика" FontSize="17" FontWeight="SemiBold" />
+                <Grid Margin="0,12,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <ComboBox x:Name="FakeTargetComboBox" Grid.Column="0" />
+                  <ComboBox x:Name="FakeFileComboBox" Grid.Column="1" />
+                  <TextBlock Grid.Column="3" Text="Замена активного UDP fake-файла" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
+                  <Button Grid.Column="4" Content="Заменить" Click="ReplaceFake_Click" Margin="8,0,0,0" />
+                </Grid>
+                <WrapPanel Margin="0,14,0,0">
+                  <Button Content="Запустить диагностику" Click="RunDiagnostics_Click" />
+                  <Button Content="Запустить тесты zapret" Click="RunUpstreamTests_Click" Margin="8,0,0,0" />
+                  <Button Content="Проверить hosts" Click="CheckHosts_Click" Margin="8,0,0,0" />
+                  <Button Content="Восстановить hosts" Click="RestoreHostsBackup_Click" Margin="8,0,0,0" />
+                </WrapPanel>
+                <TextBox x:Name="ToolsOutputTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                         MinHeight="70" MaxHeight="150" Margin="0,12,0,0" />
+                <TextBlock Text="Тесты выполняются официальным скриптом и проверяют сетевые адреса. Запуск — только по кнопке."
+                           Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <TextBlock Grid.Row="3" Text="NetShift  ·  системные изменения выполняются только после вашего действия и подтверждения UAC"
+               Foreground="{StaticResource MutedBrush}" FontSize="11" HorizontalAlignment="Center" Margin="0,10,0,0" />
+  </Grid>
+</Window>
