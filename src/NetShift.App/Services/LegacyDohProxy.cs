@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -69,7 +70,20 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
                 await udp.SendAsync(answer, request.RemoteEndPoint, cancellationToken);
         }
         catch (OperationCanceledException) { }
-        catch (HttpRequestException) { }
+        catch (HttpRequestException) { await SendServFailAsync(udp, request, cancellationToken); }
+        catch (SocketException) { await SendServFailAsync(udp, request, cancellationToken); }
+        catch (IOException) { await SendServFailAsync(udp, request, cancellationToken); }
+    }
+
+    private static async Task SendServFailAsync(UdpClient udp, UdpReceiveResult request, CancellationToken cancellationToken)
+    {
+        if (request.Buffer.Length < 12) return;
+        var response = (byte[])request.Buffer.Clone();
+        response[2] |= 0x80;
+        response[3] = (byte)((response[3] & 0xF0) | 0x02);
+        Array.Clear(response, 6, 6);
+        try { await udp.SendAsync(response, request.RemoteEndPoint, cancellationToken); }
+        catch (OperationCanceledException) { }
         catch (SocketException) { }
     }
 
