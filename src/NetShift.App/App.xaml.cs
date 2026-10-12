@@ -20,7 +20,9 @@ public partial class App : System.Windows.Application
         }
 
         base.OnStartup(e);
+        var updateBackupPath = NetShiftUpdateService.GetPendingUpdateBackup(e.Args, Environment.ProcessPath);
         var window = new MainWindow();
+        window.ContentRendered += (_, _) => NetShiftUpdateService.ConfirmUpdateStartup(updateBackupPath);
         MainWindow = window;
         window.Show();
     }

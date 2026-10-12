@@ -36,9 +36,61 @@ public static class NetShiftUpdateService
             if (versionMatch.Success) return versionMatch.Groups["version"].Value;
 
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version?.ToString(3) ?? "0.3.025";
+            return version?.ToString(3) ?? "0.3.026";
         }
     }
+
+    internal static string? GetPendingUpdateBackup(string[] args, string? executablePath)
+    {
+        if (args.Length != 2 || !args[0].Equals("--confirm-update", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(executablePath) ||
+            !Path.GetFileName(executablePath).Equals("NetShift.exe", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var executable = Path.GetFullPath(executablePath);
+        var candidate = Path.GetFullPath(args[1]);
+        var expectedPrefix = Path.GetFileName(executable) + ".update-backup-";
+        var candidateName = Path.GetFileName(candidate);
+        var suffix = candidateName.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase) ? candidateName[expectedPrefix.Length..] : string.Empty;
+        if (!Path.GetDirectoryName(candidate)!.Equals(Path.GetDirectoryName(executable), StringComparison.OrdinalIgnoreCase) ||
+            !Guid.TryParseExact(suffix, "N", out _) || !File.Exists(candidate))
+            return null;
+        return candidate;
+    }
+
+    internal static void ConfirmUpdateStartup(string? backupPath)
+    {
+        if (backupPath is null) return;
+        try { File.Delete(backupPath); } catch { }
+    }
+
+    internal static string BuildUpdaterScript(string source, string target, string backup, string replacement, string sourceHash,
+        string workingDirectory, string logPath, int processId) =>
+        "$ErrorActionPreference = 'Stop'; " +
+        $"$source = {PsLiteral(source)}; $target = {PsLiteral(target)}; $backup = {PsLiteral(backup)}; $replacement = {PsLiteral(replacement)}; " +
+        $"$sourceHash = {PsLiteral(sourceHash)}; " +
+        $"$workingDirectory = {PsLiteral(workingDirectory)}; $logPath = {PsLiteral(logPath)}; " +
+        $"$parentId = {processId}; $newProcess = $null; " +
+        "try { " +
+        "Wait-Process -Id $parentId -Timeout 120 -ErrorAction SilentlyContinue; " +
+        "if (Get-Process -Id $parentId -ErrorAction SilentlyContinue) { throw 'NetShift не завершился за отведённое время.' }; " +
+        "if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'Файл обновления не найден.' }; " +
+        "if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $sourceHash) { throw 'Файл обновления изменился после проверки.' }; " +
+        "Copy-Item -LiteralPath $source -Destination $replacement; " +
+        "if ((Get-FileHash -LiteralPath $replacement -Algorithm SHA256).Hash -ne $sourceHash) { throw 'Не удалось проверить временную копию обновления.' }; " +
+        "[IO.File]::Replace($replacement, $target, $backup, $true); " +
+        "$startInfo = [Diagnostics.ProcessStartInfo]::new($target); $startInfo.WorkingDirectory = $workingDirectory; $startInfo.UseShellExecute = $false; " +
+        "$startInfo.Arguments = '--confirm-update \"' + $backup + '\"'; $newProcess = [Diagnostics.Process]::Start($startInfo); " +
+        "if (-not $newProcess.WaitForInputIdle(30000)) { throw 'Новая версия не завершила запуск за отведённое время.' }; " +
+        "for ($attempt = 0; $attempt -lt 120 -and (Test-Path -LiteralPath $backup); $attempt++) { " +
+        "if ($newProcess.HasExited) { throw 'Новая версия завершилась до подтверждения запуска.' }; Start-Sleep -Milliseconds 500 }; " +
+        "if (Test-Path -LiteralPath $backup) { throw 'Новая версия не подтвердила успешный запуск за отведённое время.' }; " +
+        "} catch { " +
+        "if ($null -ne $newProcess -and -not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force -ErrorAction SilentlyContinue; try { $newProcess.WaitForExit(15000) } catch {} }; " +
+        "if (Test-Path -LiteralPath $backup) { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }; Move-Item -LiteralPath $backup -Destination $target -Force }; " +
+        "if (Test-Path -LiteralPath $replacement) { Remove-Item -LiteralPath $replacement -Force }; " +
+        "[IO.File]::WriteAllText($logPath, $_.Exception.Message); " +
+        "try { Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show(('Не удалось обновить NetShift: ' + $_.Exception.Message), 'NetShift') | Out-Null } catch {}; " +
+        "} finally { if (Test-Path -LiteralPath $replacement) { Remove-Item -LiteralPath $replacement -Force -ErrorAction SilentlyContinue } }";
 
     public static string? Repository
     {
@@ -185,26 +237,12 @@ public static class NetShiftUpdateService
             throw new InvalidOperationException("Не удалось проверить пути для установки обновления NetShift.");
 
         var workingDirectory = Path.GetDirectoryName(target)!;
-        var backup = target + ".update-backup";
+        var backup = target + ".update-backup-" + Guid.NewGuid().ToString("N");
+        var replacement = target + ".update-new-" + Guid.NewGuid().ToString("N");
         var logPath = Path.Combine(Path.GetDirectoryName(source)!, "update.log");
-        var script = "$ErrorActionPreference = 'Stop'; " +
-                     $"$source = {PsLiteral(source)}; $target = {PsLiteral(target)}; $backup = {PsLiteral(backup)}; " +
-                     $"$workingDirectory = {PsLiteral(workingDirectory)}; $logPath = {PsLiteral(logPath)}; " +
-                     $"$parentId = {processId}; " +
-                     "try { " +
-                     "Wait-Process -Id $parentId -Timeout 120 -ErrorAction SilentlyContinue; " +
-                     "if (Get-Process -Id $parentId -ErrorAction SilentlyContinue) { throw 'NetShift не завершился за отведённое время.' }; " +
-                     "if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'Файл обновления не найден.' }; " +
-                     "if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }; " +
-                     "Move-Item -LiteralPath $target -Destination $backup -Force; " +
-                     "try { Move-Item -LiteralPath $source -Destination $target -Force } catch { Move-Item -LiteralPath $backup -Destination $target -Force; throw }; " +
-                     "Start-Process -FilePath $target -WorkingDirectory $workingDirectory; " +
-                     "Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue; " +
-                     "} catch { " +
-                     "if ((Test-Path -LiteralPath $backup) -and -not (Test-Path -LiteralPath $target)) { Move-Item -LiteralPath $backup -Destination $target -Force }; " +
-                     "[IO.File]::WriteAllText($logPath, $_.Exception.Message); " +
-                     "try { Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show(('Не удалось обновить NetShift: ' + $_.Exception.Message), 'NetShift') | Out-Null } catch {}; " +
-                     "}";
+        using var sourceStream = File.OpenRead(source);
+        var sourceHash = Convert.ToHexString(SHA256.HashData(sourceStream));
+        var script = BuildUpdaterScript(source, target, backup, replacement, sourceHash, workingDirectory, logPath, processId);
         var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         var powershellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
         var startInfo = new ProcessStartInfo(powershellPath)

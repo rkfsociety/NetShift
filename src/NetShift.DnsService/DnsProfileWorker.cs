@@ -142,7 +142,13 @@ internal sealed class DnsProfileWorker(ILogger<DnsProfileWorker> logger) : Backg
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить PowerShell.");
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
+        if (!process.WaitForExit(60_000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            process.WaitForExit();
+            Task.WaitAll(standardOutput, standardError);
+            throw new TimeoutException("PowerShell не завершил применение DNS за 60 секунд.");
+        }
         Task.WaitAll(standardOutput, standardError);
         if (process.ExitCode == 0) return;
         var detail = ExtractPowerShellError(standardError.Result);

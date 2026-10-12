@@ -6,8 +6,8 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Collections.ObjectModel;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -32,17 +32,19 @@ public partial class MainWindow : Window
     private int? _legacyAdapterIndex;
     private string? _legacyDohEndpoint;
     private bool _allowClose;
+    private bool _exitRequested;
+    private bool _closeInProgress;
     private bool _trayNoticeShown;
     private bool _trayIconDisposed;
 
     public MainWindow()
     {
         InitializeComponent();
-        SourceInitialized += (_, _) => ApplyDarkTitleBar();
         _trayIcon = CreateTrayIcon();
+        SourceInitialized += (_, _) => ApplyDarkTitleBar();
         Closing += MainWindow_Closing;
         Closed += (_, _) => DisposeTrayIcon();
-        System.Windows.Application.Current.SessionEnding += (_, _) => AllowCloseAndDisposeTrayIcon();
+        System.Windows.Application.Current.SessionEnding += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
         ProviderComboBox.ItemsSource = _dnsProviders;
         Loaded += MainWindow_Loaded;
         GameFilterModeComboBox.ItemsSource = new[]
@@ -79,7 +81,7 @@ public partial class MainWindow : Window
         ConfigureVpnAdaptersCheckBox.IsChecked = _settings.ConfigureVpnAdapters;
         AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
-        RefreshDnsServiceStatus();
+        _ = RefreshDnsServiceStatusAsync();
         RefreshAdapters(selectFirst: true);
         RefreshZapretFolder();
     }
@@ -103,6 +105,7 @@ public partial class MainWindow : Window
         ZapretNavigationButton.BorderBrush = showDns ? System.Windows.Media.Brushes.Transparent : selectedBorder;
         ZapretNavigationButton.Foreground = showDns ? idleForeground : selectedForeground;
     }
+
     private void ApplyDarkTitleBar()
     {
         var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
@@ -114,18 +117,13 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int valueSize);
 
-
     private System.Windows.Forms.NotifyIcon CreateTrayIcon()
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
         var openItem = new System.Windows.Forms.ToolStripMenuItem("Открыть NetShift");
         openItem.Click += (_, _) => Dispatcher.BeginInvoke(ShowFromTray);
         var exitItem = new System.Windows.Forms.ToolStripMenuItem("Выход");
-        exitItem.Click += (_, _) => Dispatcher.BeginInvoke(() =>
-        {
-            if (!AllowCloseAndDisposeTrayIcon()) return;
-            System.Windows.Application.Current.Shutdown();
-        });
+        exitItem.Click += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
         menu.Items.Add(openItem);
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add(exitItem);
@@ -148,13 +146,58 @@ public partial class MainWindow : Window
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_allowClose) return;
-
         e.Cancel = true;
-        Hide();
-        if (_trayNoticeShown) return;
-        _trayNoticeShown = true;
-        _trayIcon.ShowBalloonTip(3500, "NetShift продолжает работать", "Окно скрыто в системный трей. Откройте значок NetShift, чтобы вернуться.",
-            System.Windows.Forms.ToolTipIcon.Info);
+        if (!_exitRequested)
+        {
+            Hide();
+            if (!_trayNoticeShown)
+            {
+                _trayNoticeShown = true;
+                _trayIcon.ShowBalloonTip(3500, "NetShift продолжает работать", "Окно скрыто в системный трей. Откройте значок NetShift, чтобы вернуться.",
+                    System.Windows.Forms.ToolTipIcon.Info);
+            }
+            return;
+        }
+        if (_closeInProgress) return;
+        _closeInProgress = true;
+        _ = CompleteCloseAsync();
+    }
+
+    private void ExitApplication()
+    {
+        _exitRequested = true;
+        Close();
+    }
+
+    private async Task CompleteCloseAsync()
+    {
+        await Task.Yield();
+        try
+        {
+            if (!await StopLegacyDnsAndRestoreAsync())
+            {
+                _exitRequested = false;
+                ShowFromTray();
+                MessageBox.Show(this, "Не удалось вернуть DNS адаптера. NetShift останется запущен, чтобы не потерять локальный DNS-прокси.",
+                    "Legacy DNS ещё активен", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _allowClose = true;
+            DisposeTrayIcon();
+            Close();
+        }
+        catch (Exception error)
+        {
+            _allowClose = false;
+            _exitRequested = false;
+            ShowFromTray();
+            MessageBox.Show(this, error.Message, "Не удалось безопасно завершить NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _closeInProgress = false;
+        }
     }
 
     private void ShowFromTray()
@@ -163,20 +206,6 @@ public partial class MainWindow : Window
             WindowState = WindowState.Normal;
         Show();
         Activate();
-    }
-
-    private bool AllowCloseAndDisposeTrayIcon()
-    {
-        if (!StopLegacyDnsAndRestore())
-        {
-            ShowFromTray();
-            MessageBox.Show(this, "Не удалось вернуть DNS адаптера. NetShift останется запущен, чтобы не потерять локальный DNS-прокси.",
-                "Legacy DNS ещё активен", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-        _allowClose = true;
-        DisposeTrayIcon();
-        return true;
     }
 
     private void DisposeTrayIcon()
@@ -287,7 +316,7 @@ public partial class MainWindow : Window
         SavePackageSettingsButton.IsEnabled = valid;
         RefreshPackageSettings(valid ? folder : string.Empty);
         RefreshFakeFiles(valid ? folder : string.Empty);
-        RefreshServiceStatus();
+        _ = RefreshServiceStatusAsync();
     }
 
     private void RefreshPackageSettings(string folder)
@@ -359,10 +388,10 @@ public partial class MainWindow : Window
         FakeFileComboBox.IsEnabled = fakes.Length > 0;
     }
 
-    private void RefreshServiceStatus()
+    private async Task RefreshServiceStatusAsync()
     {
         if (ServiceStatusText is null) return;
-        var output = QueryWindowsService("zapret");
+        var output = await QueryWindowsServiceAsync("zapret");
         CheckActiveStrategyButton.IsEnabled = output?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true;
         if (output is null)
         {
@@ -398,22 +427,14 @@ public partial class MainWindow : Window
         RemoveServiceButton.IsEnabled = packageSelected;
     }
 
-    private static string? QueryWindowsService(string serviceName)
+    private static async Task<string?> QueryWindowsServiceAsync(string serviceName)
     {
         try
         {
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe");
-            var startInfo = new ProcessStartInfo(path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            startInfo.ArgumentList.Add("query");
-            startInfo.ArgumentList.Add(serviceName);
-            using var process = Process.Start(startInfo);
-            if (process is null) return null;
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
-            process.WaitForExit();
-            Task.WaitAll(stdout, stderr);
-            var output = stdout.Result + Environment.NewLine + stderr.Result;
-            return process.ExitCode == 0 ? output : null;
+            var result = await ProcessExecutionService.CaptureAsync(path, ["query", serviceName], TimeSpan.FromSeconds(15));
+            var output = result.StandardOutput + Environment.NewLine + result.StandardError;
+            return result.ExitCode == 0 ? output : null;
         }
         catch { return null; }
     }
@@ -479,7 +500,7 @@ public partial class MainWindow : Window
         {
             if (Convert.ToInt32(legacyProfile?.GetValue("Enabled", 0) ?? 0) == 1)
             {
-                if (!RunElevatedWorker("dns-legacy-restore"))
+                if (!await RunElevatedWorkerAsync("dns-legacy-restore"))
                 {
                     MessageBox.Show(this, "Сначала восстановите предыдущие DNS-настройки Legacy, чтобы не потерять подключение.",
                         "Нужно восстановить DNS", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -490,11 +511,11 @@ public partial class MainWindow : Window
 
         if (NetShiftBootstrapper.HasEmbeddedDnsService() && !IsDnsServiceCurrent())
         {
-            DnsServiceStatusText.Text = QueryWindowsService("NetShiftDns") is null
+            DnsServiceStatusText.Text = await QueryWindowsServiceAsync("NetShiftDns") is null
                 ? "Первый запуск: устанавливаю службу DNS. Windows попросит подтвердить системную службу."
                 : "Обновляю DNS-службу. Текущие DNS-адреса в Windows останутся активны.";
-            RunElevatedWorker("dns-service-install-embedded");
-            RefreshDnsServiceStatus();
+            await RunElevatedWorkerAsync("dns-service-install-embedded");
+            await RefreshDnsServiceStatusAsync();
         }
 
         await Task.WhenAll(
@@ -503,7 +524,7 @@ public partial class MainWindow : Window
 
         if (!_settings.InitialZapretCheckCompleted)
         {
-            if (IsZapretServiceRunning())
+            if (await IsZapretServiceRunningAsync())
                 await CheckActiveZapretStrategyAsync(isInitialCheck: true);
             else
                 ZapretHealthStatusText.Text = "Первичная проверка zapret выполнится, когда его служба будет запущена.";
@@ -549,10 +570,10 @@ public partial class MainWindow : Window
         catch { return false; }
     }
 
-    private void RefreshDnsServiceStatus()
+    private async Task RefreshDnsServiceStatusAsync()
     {
         if (DnsServiceStatusText is null) return;
-        var output = QueryWindowsService("NetShiftDns");
+        var output = await QueryWindowsServiceAsync("NetShiftDns");
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         if (output is null)
         {
@@ -619,7 +640,7 @@ public partial class MainWindow : Window
         try
         {
             DnsServiceStatusText.Text = "Устанавливаю встроенную DNS-службу. Windows запросит права администратора.";
-            if (RunElevatedWorker("dns-service-install-embedded"))
+            if (await RunElevatedWorkerAsync("dns-service-install-embedded"))
                 DnsServiceStatusText.Text = "DNS-служба установлена и настроена на автоматический запуск вместе с Windows.";
         }
         catch (Exception error)
@@ -629,22 +650,22 @@ public partial class MainWindow : Window
         }
         finally
         {
-            RefreshDnsServiceStatus();
+            await RefreshDnsServiceStatusAsync();
         }
     }
 
-    private void RemoveDnsService_Click(object sender, RoutedEventArgs e)
+    private async void RemoveDnsService_Click(object sender, RoutedEventArgs e)
     {
         if (MessageBox.Show(this,
                 "Удалить службу NetShift DNS? Системные DNS-адреса останутся настроенными в Windows, но служба больше не будет восстанавливать профиль при запуске компьютера.",
                 "Удалить DNS-службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
             return;
-        if (RunElevatedWorker("dns-service-remove"))
+        if (await RunElevatedWorkerAsync("dns-service-remove"))
             DnsServiceStatusText.Text = "DNS-служба удалена. DNS Windows оставлен без изменений.";
-        RefreshDnsServiceStatus();
+        await RefreshDnsServiceStatusAsync();
     }
 
-    private void RefreshDnsServiceStatus_Click(object sender, RoutedEventArgs e) => RefreshDnsServiceStatus();
+    private async void RefreshDnsServiceStatus_Click(object sender, RoutedEventArgs e) => await RefreshDnsServiceStatusAsync();
 
     private async Task CheckNetShiftUpdatesAsync(bool showError)
     {
@@ -705,11 +726,13 @@ public partial class MainWindow : Window
             UpdateStatusText.Text = $"Скачиваю NetShift {update.Tag}: 0%";
             var progress = new Progress<double>(value => UpdateStatusText.Text = $"Скачиваю NetShift {update.Tag}: {value:P0}");
             var stagedExecutable = await NetShiftUpdateService.DownloadAndExtractAsync(update, progress, CancellationToken.None);
+            if (!await StopLegacyDnsAndRestoreAsync())
+                throw new InvalidOperationException("Сначала восстановите DNS Legacy, затем повторите обновление NetShift.");
             var targetExecutable = Path.Combine(AppContext.BaseDirectory, "NetShift.exe");
             NetShiftUpdateService.LaunchUpdater(stagedExecutable, targetExecutable, Environment.ProcessId);
             UpdateStatusText.Text = "Обновление подготовлено; NetShift перезапустится автоматически…";
-            AllowCloseAndDisposeTrayIcon();
-            Application.Current.Shutdown();
+            _exitRequested = true;
+            Close();
         }
         catch (Exception error)
         {
@@ -758,7 +781,7 @@ public partial class MainWindow : Window
         RefreshAdapters(selectFirst: true);
     }
 
-    private void ApplyDns_Click(object sender, RoutedEventArgs e)
+    private async void ApplyDns_Click(object sender, RoutedEventArgs e)
     {
         if (AdapterComboBox.SelectedItem is not NetworkAdapterInfo adapter)
         {
@@ -804,11 +827,11 @@ public partial class MainWindow : Window
             {
                 if (_legacyDohProxy is null || _legacyAdapterIndex != adapter.InterfaceIndex || !string.Equals(_legacyDohEndpoint, dohTemplate, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!StopLegacyDnsAndRestore()) return;
-                    _legacyDohProxy = new LegacyDohProxy(dohTemplate);
+                    if (!await StopLegacyDnsAndRestoreAsync()) return;
+                    _legacyDohProxy = await LegacyDohProxy.CreateAsync(dohTemplate);
                     _legacyDohEndpoint = dohTemplate;
                 }
-                if (RunElevatedWorker("dns-legacy-apply", adapter.InterfaceIndex.ToString(), (SupportIPv6CheckBox.IsChecked == true).ToString()))
+                if (await RunElevatedWorkerAsync("dns-legacy-apply", adapter.InterfaceIndex.ToString(), (SupportIPv6CheckBox.IsChecked == true).ToString()))
                 {
                     _legacyAdapterIndex = adapter.InterfaceIndex;
                     _settings.NativeDnsMode = false;
@@ -819,7 +842,7 @@ public partial class MainWindow : Window
                 }
                 else if (_legacyAdapterIndex is null && _legacyDohProxy is not null)
                 {
-                    _legacyDohProxy.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    await _legacyDohProxy.DisposeAsync();
                     _legacyDohProxy = null;
                     _legacyDohEndpoint = null;
                 }
@@ -828,7 +851,7 @@ public partial class MainWindow : Window
             {
                 if (_legacyAdapterIndex is null && _legacyDohProxy is not null)
                 {
-                    _ = _legacyDohProxy.DisposeAsync();
+                    await _legacyDohProxy.DisposeAsync();
                     _legacyDohProxy = null;
                 }
                 MessageBox.Show(this, error.Message, "Не удалось включить Legacy DNS", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -836,8 +859,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!StopLegacyDnsAndRestore()) return;
-        if (RunElevatedWorker("dns-apply", adapter.InterfaceIndex.ToString(), string.Join(',', addresses), dohTemplate))
+        if (!await StopLegacyDnsAndRestoreAsync()) return;
+        if (await RunElevatedWorkerAsync("dns-apply", adapter.InterfaceIndex.ToString(), string.Join(',', addresses), dohTemplate))
         {
             _settings.NativeDnsMode = true;
             _settings.SupportIPv6 = SupportIPv6CheckBox.IsChecked == true;
@@ -847,23 +870,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private bool StopLegacyDnsAndRestore()
+    private async Task<bool> StopLegacyDnsAndRestoreAsync()
     {
         if (_legacyAdapterIndex is not null)
         {
-            if (!RunElevatedWorker("dns-legacy-restore")) return false;
+            if (!await RunElevatedWorkerAsync("dns-legacy-restore")) return false;
             _legacyAdapterIndex = null;
         }
         if (_legacyDohProxy is not null)
         {
-            _legacyDohProxy.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            await _legacyDohProxy.DisposeAsync();
             _legacyDohProxy = null;
             _legacyDohEndpoint = null;
         }
         return true;
     }
 
-    private void ResetDns_Click(object sender, RoutedEventArgs e)
+    private async void ResetDns_Click(object sender, RoutedEventArgs e)
     {
         if (AdapterComboBox.SelectedItem is not NetworkAdapterInfo adapter)
         {
@@ -876,8 +899,8 @@ public partial class MainWindow : Window
             "Вернуть DHCP", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirmation != MessageBoxResult.OK) return;
 
-        if (!StopLegacyDnsAndRestore()) return;
-        if (RunElevatedWorker("dns-reset", adapter.InterfaceIndex.ToString()))
+        if (!await StopLegacyDnsAndRestoreAsync()) return;
+        if (await RunElevatedWorkerAsync("dns-reset", adapter.InterfaceIndex.ToString()))
         {
             _settings.NativeDnsMode = false;
             SaveSettings();
@@ -889,12 +912,12 @@ public partial class MainWindow : Window
     private static IEnumerable<string> SplitAddresses(string value) => value
         .Split([',', ';', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(address => IPAddress.TryParse(address, out var parsed) ? parsed.ToString() : address);
+
     private static (string Primary, string Alternate) SplitAddressPair(string value)
     {
         var addresses = value.Split([',', ';', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return (addresses.ElementAtOrDefault(0) ?? string.Empty, addresses.ElementAtOrDefault(1) ?? string.Empty);
     }
-
 
     private static bool HasFamily(IEnumerable<string> addresses, AddressFamily expectedFamily) =>
         addresses.All(address => IPAddress.TryParse(address, out var parsed) && parsed.AddressFamily == expectedFamily);
@@ -943,13 +966,13 @@ public partial class MainWindow : Window
                 $"Запустить {strategy.Name}? Скрипт Flowseal изменит обработку сетевого трафика и может включить TCP timestamps. Windows запросит права администратора.",
                 "Запуск zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (confirmation != MessageBoxResult.OK) return;
-            RunElevatedWorker("zapret-start", strategy.Path);
-            RefreshServiceStatus();
+            await RunElevatedWorkerAsync("zapret-start", strategy.Path);
+            await RefreshServiceStatusAsync();
         }
         finally { StartStrategyButton.IsEnabled = StrategyComboBox.SelectedItem is StrategyItem; }
     }
 
-    private void StopStrategy_Click(object sender, RoutedEventArgs e)
+    private async void StopStrategy_Click(object sender, RoutedEventArgs e)
     {
         var folder = ZapretFolderTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(folder)) return;
@@ -957,54 +980,54 @@ public partial class MainWindow : Window
             "Остановить winws.exe, запущенный из выбранной папки? Зарегистрированная служба Windows этим действием не удаляется.",
             "Остановить ручной запуск", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
         if (confirmation == MessageBoxResult.OK)
-            RunElevatedWorker("zapret-stop", folder);
+            await RunElevatedWorkerAsync("zapret-stop", folder);
     }
 
-    private void InstallService_Click(object sender, RoutedEventArgs e)
+    private async void InstallService_Click(object sender, RoutedEventArgs e)
     {
         if (StrategyComboBox.SelectedItem is not StrategyItem strategy) return;
         var folder = Path.GetDirectoryName(strategy.Path)!;
-        var isInstalled = QueryWindowsService("zapret") is not null;
+        var isInstalled = await QueryWindowsServiceAsync("zapret") is not null;
         var message = isInstalled
             ? $"Заменить установленную службу zapret стратегией {strategy.Name}? NetShift изменит её только если она установлена из выбранной папки или папки NetShift. Потребуются права администратора."
             : $"Установить стратегию {strategy.Name} как автоматическую службу Windows?\n\n{folder}\n\nПотребуются права администратора.";
         if (MessageBox.Show(this, message, "Установить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-service-install", strategy.Path))
+        if (await RunElevatedWorkerAsync("zapret-service-install", strategy.Path))
         {
-            RefreshServiceStatus();
+            await RefreshServiceStatusAsync();
             _ = CheckActiveZapretStrategyAsync(isInitialCheck: !_settings.InitialZapretCheckCompleted);
         }
     }
 
-    private void StartService_Click(object sender, RoutedEventArgs e)
+    private async void StartService_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
-        if (RunElevatedWorker("zapret-service-start", folder))
+        if (await RunElevatedWorkerAsync("zapret-service-start", folder))
         {
-            RefreshServiceStatus();
+            await RefreshServiceStatusAsync();
             _ = CheckActiveZapretStrategyAsync(isInitialCheck: !_settings.InitialZapretCheckCompleted);
         }
     }
 
-    private void StopService_Click(object sender, RoutedEventArgs e)
+    private async void StopService_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
         if (MessageBox.Show(this, "Остановить службу zapret? Это временно прекратит работу выбранной стратегии.",
                 "Остановить службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-service-stop", folder)) RefreshServiceStatus();
+        if (await RunElevatedWorkerAsync("zapret-service-stop", folder)) await RefreshServiceStatusAsync();
     }
 
-    private void RemoveService_Click(object sender, RoutedEventArgs e)
+    private async void RemoveService_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
-        if (QueryWindowsService("zapret") is null) { RefreshServiceStatus(); return; }
+        if (await QueryWindowsServiceAsync("zapret") is null) { await RefreshServiceStatusAsync(); return; }
         if (MessageBox.Show(this,
                 $"Остановить и удалить службу zapret из выбранной папки или папки NetShift?\n\nТекущий пакет: {folder}\n\nСлужбы и процессы других программ не затрагиваются.",
                 "Удалить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-service-remove", folder)) RefreshServiceStatus();
+        if (await RunElevatedWorkerAsync("zapret-service-remove", folder)) await RefreshServiceStatusAsync();
     }
 
-    private void RefreshServiceStatus_Click(object sender, RoutedEventArgs e) => RefreshServiceStatus();
+    private async void RefreshServiceStatus_Click(object sender, RoutedEventArgs e) => await RefreshServiceStatusAsync();
 
     private async void CheckActiveStrategy_Click(object sender, RoutedEventArgs e)
     {
@@ -1013,10 +1036,10 @@ public partial class MainWindow : Window
 
     private async Task CheckActiveZapretStrategyAsync(bool isInitialCheck)
     {
-        for (var attempt = 0; attempt < (isInitialCheck ? 5 : 1) && !IsZapretServiceRunning(); attempt++)
+        for (var attempt = 0; attempt < (isInitialCheck ? 5 : 1) && !await IsZapretServiceRunningAsync(); attempt++)
             await Task.Delay(1000);
 
-        if (!IsZapretServiceRunning())
+        if (!await IsZapretServiceRunningAsync())
         {
             ZapretHealthStatusText.Text = "Проверка доступна только для запущенной службы zapret; служба DNS не затрагивается.";
             return;
@@ -1078,8 +1101,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool IsZapretServiceRunning() =>
-        QueryWindowsService("zapret")?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true;
+    private static async Task<bool> IsZapretServiceRunningAsync() =>
+        (await QueryWindowsServiceAsync("zapret"))?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true;
 
     private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
 
@@ -1097,7 +1120,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SavePackageSettings_Click(object sender, RoutedEventArgs e)
+    private async void SavePackageSettings_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
         if (GameFilterModeComboBox.SelectedValue is not string mode || IpSetModeComboBox.SelectedValue is not string ipSetMode ||
@@ -1116,7 +1139,7 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this,
                 "Сохранить игровой фильтр, режим IPSet и проверку последнего релиза перед запуском? Изменение фильтра вступит в силу после перезапуска стратегии.",
                 "Сохранить параметры zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-settings-save", folder, mode, GameFilterTcpTextBox.Text.Trim(), GameFilterUdpTextBox.Text.Trim(), ipSetMode))
+        if (await RunElevatedWorkerAsync("zapret-settings-save", folder, mode, GameFilterTcpTextBox.Text.Trim(), GameFilterUdpTextBox.Text.Trim(), ipSetMode))
         {
             _settings.CheckZapretUpdatesBeforeStart = AutoUpdateCheckBox.IsChecked == true;
             SaveSettings();
@@ -1142,7 +1165,7 @@ public partial class MainWindow : Window
             DownloadStatusText.Text = "Загружаю список IPSet с официального репозитория…";
             var content = await ZapretReleaseService.DownloadIpSetAsync(CancellationToken.None);
             var path = ZapretReleaseService.CacheText($"ipset-{Guid.NewGuid():N}.txt", content);
-            if (RunElevatedWorker("zapret-ipset-update", folder, path, ComputeFileSha256(path)))
+            if (await RunElevatedWorkerAsync("zapret-ipset-update", folder, path, ComputeFileSha256(path)))
             {
                 SetToolsOutput($"Список IPSet обновлён: {content.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length:N0} строк. Предыдущий список сохранён рядом.");
                 UpdateZapretInventory();
@@ -1152,13 +1175,13 @@ public partial class MainWindow : Window
         finally { DownloadStatusText.Text = ""; }
     }
 
-    private void ReplaceFake_Click(object sender, RoutedEventArgs e)
+    private async void ReplaceFake_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder) || FakeTargetComboBox.SelectedValue is not string target || FakeFileComboBox.SelectedItem is not string fakeFile) return;
         var targetName = target == "discord" ? "Discord UDP" : "игровой UDP";
         if (MessageBox.Show(this, $"Заменить активный fake-файл для {targetName} на {fakeFile}? Текущий активный файл будет перезаписан.",
                 "Заменить fake-файл", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-fake-replace", folder, target, fakeFile)) SetToolsOutput($"Активный файл для {targetName} заменён на {fakeFile}.");
+        if (await RunElevatedWorkerAsync("zapret-fake-replace", folder, target, fakeFile)) SetToolsOutput($"Активный файл для {targetName} заменён на {fakeFile}.");
     }
 
     private async void DownloadLatest_Click(object sender, RoutedEventArgs e)
@@ -1184,7 +1207,7 @@ public partial class MainWindow : Window
             }
 
             DownloadStatusText.Text = $"ZIP {release.Tag} загружен и проверен SHA-256. Распаковываю…";
-            if (RunElevatedWorker("zapret-package-install", release.ArchivePath, release.Tag, release.Sha256))
+            if (await RunElevatedWorkerAsync("zapret-package-install", release.ArchivePath, release.Tag, release.Sha256))
             {
                 File.Delete(release.ArchivePath);
                 SelectZapretFolder(installPath);
@@ -1227,117 +1250,21 @@ public partial class MainWindow : Window
         catch (Exception error) { MessageBox.Show(this, error.Message, "Не удалось проверить релиз", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
-    private void RunDiagnostics_Click(object sender, RoutedEventArgs e)
+    private async void RunDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
-        var lines = new List<string> { "Диагностика NetShift (только чтение)", $"Папка: {folder}" };
-        var bfe = QueryWindowsService("BFE");
-        lines.Add(bfe?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true ? "✓ Base Filtering Engine работает." : "! Base Filtering Engine не запущен или недоступен.");
-        var zapret = QueryWindowsService("zapret");
-        lines.Add(zapret is null ? "• Служба zapret не установлена." : zapret.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ? "✓ Служба zapret работает." : "• Служба zapret установлена, но остановлена.");
-        var windivert = QueryWindowsService("WinDivert");
-        lines.Add(windivert is null ? "• Служба WinDivert не зарегистрирована." : "• Служба WinDivert зарегистрирована; NetShift не меняет её состояние.");
-        var tcpSettings = RunReadOnlyCommand("netsh.exe", "interface", "tcp", "show", "global");
-        var timestampLine = tcpSettings.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault(line => line.Contains("timestamp", StringComparison.OrdinalIgnoreCase) || line.Contains("метк", StringComparison.OrdinalIgnoreCase));
-        if (timestampLine is not null) lines.Add($"• TCP timestamps: {timestampLine.Trim()} (диагностика не меняет этот параметр).");
-        var processes = Process.GetProcessesByName("winws");
-        lines.Add($"• Запущено процессов winws.exe: {processes.Length}.");
-        foreach (var process in processes)
-        {
-            try { lines.Add($"  PID {process.Id}: {process.MainModule?.FileName ?? "путь недоступен"}"); }
-            catch { lines.Add($"  PID {process.Id}: путь недоступен."); }
-            process.Dispose();
-        }
-        using var internetSettings = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
-        var proxyEnable = internetSettings?.GetValue("ProxyEnable");
-        var proxyServer = internetSettings?.GetValue("ProxyServer") as string;
-        lines.Add(Convert.ToInt32(proxyEnable ?? 0) == 1 ? $"! В Windows включён системный прокси: {proxyServer}" : "✓ Системный прокси Windows выключен.");
-        var bin = Path.Combine(folder, "bin");
-        lines.Add(Directory.Exists(bin) && Directory.EnumerateFiles(bin, "*.sys").Any()
-            ? "✓ Файл драйвера WinDivert найден в пакете." : "! Файл драйвера WinDivert не найден.");
-        lines.Add(folder.Any(character => character > 127 || char.IsWhiteSpace(character))
-            ? "! В пути есть пробелы или нелатинские символы." : "✓ Путь без пробелов и нелатинских символов.");
-        var oneDrive = Environment.GetEnvironmentVariable("OneDrive");
-        if (!string.IsNullOrWhiteSpace(oneDrive) && folder.StartsWith(oneDrive, StringComparison.OrdinalIgnoreCase))
-            lines.Add("! Папка zapret находится внутри OneDrive.");
-        var services = QueryAllServices();
-        foreach (var knownConflict in new[] { "GoodbyeDPI", "discordfix_zapret", "winws1", "winws2", "Killer", "SmartByte", "TracSrvWrapper", "EPWD", "Intel Connectivity Network Service" })
-            if (services.Contains(knownConflict, StringComparison.OrdinalIgnoreCase)) lines.Add($"! Найдена потенциально конфликтующая служба: {knownConflict}.");
-        var vpnServices = services.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => line.Contains("SERVICE_NAME:", StringComparison.OrdinalIgnoreCase) && line.Contains("VPN", StringComparison.OrdinalIgnoreCase))
-            .Select(line => line[(line.IndexOf(':') + 1)..].Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (vpnServices.Length > 0) lines.Add($"! Возможные VPN-службы: {string.Join(", ", vpnServices)}.");
-        var adguardProcesses = Process.GetProcessesByName("AdguardSvc");
-        if (adguardProcesses.Length > 0) lines.Add("! Найден процесс AdGuard Service (AdguardSvc.exe), который может конфликтовать с Discord.");
-        foreach (var process in adguardProcesses) process.Dispose();
-        var hostsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "drivers", "etc", "hosts");
         try
         {
-            if (File.ReadLines(hostsPath).Any(line => line.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) || line.Contains("youtu.be", StringComparison.OrdinalIgnoreCase)))
-                lines.Add("! В системном hosts найдены записи YouTube.");
+            var lines = await ZapretDiagnosticsService.CollectAsync(folder);
+            SetToolsOutput(string.Join(Environment.NewLine, lines));
         }
-        catch { lines.Add("• Не удалось прочитать системный hosts."); }
-        lines.Add(HasDohConfiguration() ? "✓ В параметрах DNS Windows найдена настройка DoH." : "• Параметры DNS Windows не показывают DoH; проверьте защищённый DNS отдельно в браузере.");
-        lines.Add("Проверки только читают настройки. NetShift не удаляет конфликтующие службы, не очищает кэш приложений и не включает TCP timestamps автоматически.");
-        SetToolsOutput(string.Join(Environment.NewLine, lines));
-    }
-
-    private static string QueryAllServices()
-    {
-        try
+        catch (Exception error)
         {
-            var startInfo = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe"))
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
-            foreach (var argument in new[] { "query", "type=", "service", "state=", "all" }) startInfo.ArgumentList.Add(argument);
-            using var process = Process.Start(startInfo);
-            if (process is null) return string.Empty;
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            return output;
+            MessageBox.Show(this, error.Message, "Не удалось выполнить диагностику", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        catch { return string.Empty; }
     }
 
-    private static string RunReadOnlyCommand(string executable, params string[] arguments)
-    {
-        try
-        {
-            var startInfo = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), executable))
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
-            using var process = Process.Start(startInfo);
-            if (process is null) return string.Empty;
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            return output;
-        }
-        catch { return string.Empty; }
-    }
-
-    private static bool HasDohConfiguration()
-    {
-        try
-        {
-            using var root = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Dnscache\InterfaceSpecificParameters");
-            return root is not null && RegistryTreeHasDohFlag(root, 0);
-        }
-        catch { return false; }
-    }
-
-    private static bool RegistryTreeHasDohFlag(RegistryKey key, int depth)
-    {
-        if (depth > 6) return false;
-        try { if (Convert.ToInt32(key.GetValue("DohFlags") ?? 0) > 0) return true; } catch { }
-        foreach (var childName in key.GetSubKeyNames())
-        {
-            using var child = key.OpenSubKey(childName);
-            if (child is not null && RegistryTreeHasDohFlag(child, depth + 1)) return true;
-        }
-        return false;
-    }
-
-    private void RunUpstreamTests_Click(object sender, RoutedEventArgs e)
+    private async void RunUpstreamTests_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
         var script = Path.Combine(folder, "utils", "test zapret.ps1");
@@ -1349,7 +1276,7 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this,
                 "Откроется PowerShell с официальными тестами Flowseal. Скрипт проверяет сетевые адреса, может временно менять IPSet и останавливать/перезапускать winws, затем сохраняет отчёт. Для записи в папку пакета потребуется подтверждение администратора.",
                 "Запустить тесты", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-run-tests", folder))
+        if (await RunElevatedWorkerAsync("zapret-run-tests", folder))
             SetToolsOutput("Официальный тестовый скрипт запущен в отдельном окне PowerShell.");
     }
 
@@ -1377,7 +1304,7 @@ public partial class MainWindow : Window
                 $"В системный hosts будут добавлены отсутствующие записи: {missing.Length} из {entries.Length}. Это изменит разрешение адресов перечисленных доменов. NetShift сначала создаст резервную копию.\n\n{preview}{(missing.Length > 8 ? "\n…" : string.Empty)}\n\nДобавить?",
                 "Обновить hosts", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (choice != MessageBoxResult.Yes) { DownloadStatusText.Text = "Обновление hosts отменено."; return; }
-            if (RunElevatedWorker("zapret-hosts-append", downloadedPath, ComputeFileSha256(downloadedPath)))
+            if (await RunElevatedWorkerAsync("zapret-hosts-append", downloadedPath, ComputeFileSha256(downloadedPath)))
             {
                 SetToolsOutput($"Добавлено записей hosts: {missing.Length}. Резервная копия создана рядом с системным hosts.");
                 DownloadStatusText.Text = "Hosts обновлён";
@@ -1390,7 +1317,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RestoreHostsBackup_Click(object sender, RoutedEventArgs e)
+    private async void RestoreHostsBackup_Click(object sender, RoutedEventArgs e)
     {
         var hostsDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "drivers", "etc");
         var backup = Directory.Exists(hostsDirectory)
@@ -1406,7 +1333,7 @@ public partial class MainWindow : Window
                 "Восстановить hosts", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         try
         {
-            if (RunElevatedWorker("zapret-hosts-restore", backup, ComputeFileSha256(backup)))
+        if (await RunElevatedWorkerAsync("zapret-hosts-restore", backup, ComputeFileSha256(backup)))
                 SetToolsOutput($"Системный hosts восстановлен из {Path.GetFileName(backup)}. Предыдущее содержимое также сохранено.");
         }
         catch (Exception error) { MessageBox.Show(this, error.Message, "Не удалось восстановить hosts", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -1434,7 +1361,7 @@ public partial class MainWindow : Window
 
     private void SetToolsOutput(string value) => ToolsOutputTextBox.Text = value;
 
-    private bool RunElevatedWorker(params string[] arguments)
+    private async Task<bool> RunElevatedWorkerAsync(params string[] arguments)
     {
         var executable = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executable))
@@ -1455,7 +1382,19 @@ public partial class MainWindow : Window
             };
             using var process = Process.Start(startInfo);
             if (process is null) return false;
-            process.WaitForExit();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                await process.WaitForExitAsync();
+                MessageBox.Show(this, "Административная операция не завершилась за 10 минут и была остановлена.",
+                    "NetShift", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
             if (process.ExitCode == 0) return true;
             MessageBox.Show(this, "Действие завершилось с ошибкой. Проверьте сообщение административного процесса и статус сети.",
                 "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);

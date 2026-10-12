@@ -2,6 +2,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Collections.Concurrent;
 
 namespace NetShift.App.Services;
 
@@ -12,15 +13,23 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
     private readonly HttpClient _http;
     private readonly UdpClient[] _udp;
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly SemaphoreSlim _requestLimit = new(64);
+    private readonly ConcurrentDictionary<long, Task> _forwarding = new();
+    private long _nextRequestId;
     private readonly Task _loop;
 
-    public LegacyDohProxy(string endpoint)
+    public static async Task<LegacyDohProxy> CreateAsync(string endpoint, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             throw new ArgumentException("Для Legacy нужен HTTPS-адрес DoH.", nameof(endpoint));
-        _endpoint = uri;
-        var bootstrap = Dns.GetHostAddresses(uri.DnsSafeHost);
+        var bootstrap = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, cancellationToken);
         if (bootstrap.Length == 0) throw new InvalidOperationException("Не удалось разрешить адрес DoH до включения Legacy.");
+        return new LegacyDohProxy(uri, bootstrap);
+    }
+
+    private LegacyDohProxy(Uri uri, IPAddress[] bootstrap)
+    {
+        _endpoint = uri;
         var handler = new SocketsHttpHandler
         {
             ConnectCallback = async (_, cancellationToken) =>
@@ -52,8 +61,24 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
             try { request = await udp.ReceiveAsync(cancellationToken); }
             catch (OperationCanceledException) { break; }
             catch (SocketException) when (cancellationToken.IsCancellationRequested) { break; }
-            _ = ForwardAsync(udp, request, cancellationToken);
+            try { await _requestLimit.WaitAsync(cancellationToken); }
+            catch (OperationCanceledException) { break; }
+            var id = Interlocked.Increment(ref _nextRequestId);
+            var task = ForwardAndReleaseAsync(udp, request, cancellationToken);
+            _forwarding[id] = task;
+            _ = task.ContinueWith(completed =>
+            {
+                _forwarding.TryRemove(id, out var removed);
+                _ = completed.Exception;
+            }, CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
+    }
+
+    private async Task ForwardAndReleaseAsync(UdpClient udp, UdpReceiveResult request, CancellationToken cancellationToken)
+    {
+        try { await ForwardAsync(udp, request, cancellationToken); }
+        finally { _requestLimit.Release(); }
     }
 
     private async Task ForwardAsync(UdpClient udp, UdpReceiveResult request, CancellationToken cancellationToken)
@@ -69,10 +94,13 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
             if (answer.Length is >= 12 and <= 65507)
                 await udp.SendAsync(answer, request.RemoteEndPoint, cancellationToken);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) { await SendServFailAsync(udp, request, cancellationToken); }
         catch (HttpRequestException) { await SendServFailAsync(udp, request, cancellationToken); }
         catch (SocketException) { await SendServFailAsync(udp, request, cancellationToken); }
         catch (IOException) { await SendServFailAsync(udp, request, cancellationToken); }
+        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested) { await SendServFailAsync(udp, request, cancellationToken); }
     }
 
     private static async Task SendServFailAsync(UdpClient udp, UdpReceiveResult request, CancellationToken cancellationToken)
@@ -85,6 +113,7 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
         try { await udp.SendAsync(response, request.RemoteEndPoint, cancellationToken); }
         catch (OperationCanceledException) { }
         catch (SocketException) { }
+        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     public async ValueTask DisposeAsync()
@@ -92,7 +121,10 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
         _shutdown.Cancel();
         foreach (var udp in _udp) udp.Dispose();
         try { await _loop; } catch (ObjectDisposedException) { }
+        while (!_forwarding.IsEmpty)
+            await Task.WhenAll(_forwarding.Values);
         _http.Dispose();
+        _requestLimit.Dispose();
         _shutdown.Dispose();
     }
 }

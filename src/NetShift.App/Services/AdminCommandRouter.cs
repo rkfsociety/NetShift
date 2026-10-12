@@ -81,15 +81,22 @@ public static class AdminCommandRouter
                         throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
                     var includeIpv6Loopback = args.Length > 3 && bool.TryParse(args[3], out var enableLegacyIpv6) && enableLegacyIpv6;
                     RunPowerShell($"$ErrorActionPreference='Stop'; $i={interfaceIndex}; $a=Get-NetAdapter -InterfaceIndex $i -ErrorAction Stop; " +
+                        "$backup=[Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\LegacyDns'); " +
+                        LegacyDnsScriptFragments.CaptureBackupOnlyWhenInactive +
                         "$d4=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv4).ServerAddresses); " +
                         "$d6=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv6).ServerAddresses); " +
-                        "$backup=[Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\LegacyDns'); " +
+                        "$guidText=([guid]$a.InterfaceGuid).ToString('D'); " +
+                        "$v4Key=Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\'+$guidText) -ErrorAction SilentlyContinue; " +
+                        "$v6Key=Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters\\Interfaces\\'+$guidText) -ErrorAction SilentlyContinue; " +
+                        "$dhcp4=[string]::IsNullOrWhiteSpace([string]$v4Key.NameServer); $dhcp6=[string]::IsNullOrWhiteSpace([string]$v6Key.NameServer); " +
                         "$backup.SetValue('InterfaceGuid',([guid]$a.InterfaceGuid).ToString('D'),[Microsoft.Win32.RegistryValueKind]::String); " +
                         "$backup.SetValue('InterfaceIndex',$i,[Microsoft.Win32.RegistryValueKind]::DWord); " +
                         "$backup.SetValue('IPv4',[string[]]$d4,[Microsoft.Win32.RegistryValueKind]::MultiString); " +
                         "$backup.SetValue('IPv6',[string[]]$d6,[Microsoft.Win32.RegistryValueKind]::MultiString); " +
+                        "$backup.SetValue('DhcpIPv4',[int]$dhcp4,[Microsoft.Win32.RegistryValueKind]::DWord); " +
+                        "$backup.SetValue('DhcpIPv6',[int]$dhcp6,[Microsoft.Win32.RegistryValueKind]::DWord); " +
                         "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns'); if($null -ne $native){$backup.SetValue('NativeEnabled',[int]$native.GetValue('Enabled',0),[Microsoft.Win32.RegistryValueKind]::DWord);$backup.SetValue('NativeGuid',[string]$native.GetValue('InterfaceGuid',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeAddresses',[string[]]$native.GetValue('Addresses',@()),[Microsoft.Win32.RegistryValueKind]::MultiString);$backup.SetValue('NativeDoh',[string]$native.GetValue('DohTemplate',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeRevision',[long]$native.GetValue('Revision',0),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
-                        "$backup.SetValue('Enabled',1,[Microsoft.Win32.RegistryValueKind]::DWord); $backup.Dispose(); " +
+                        "$backup.SetValue('Enabled',1,[Microsoft.Win32.RegistryValueKind]::DWord) }; $backup.Dispose(); " +
                         "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns',$true); if($null -ne $native){$r=[long]$native.GetValue('Revision',0);$native.SetValue('Enabled',0,[Microsoft.Win32.RegistryValueKind]::DWord);$native.SetValue('Revision',($r+1),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
                         $"$loopback=@('127.0.0.1'); {(includeIpv6Loopback ? "$loopback+=@('::1');" : string.Empty)} Set-DnsClientServerAddress -InterfaceIndex $i -ServerAddresses $loopback");
                     break;
@@ -98,8 +105,10 @@ public static class AdminCommandRouter
                     RunPowerShell("$ErrorActionPreference='Stop'; $backup=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\LegacyDns',$true); " +
                         "if($null -ne $backup -and [int]$backup.GetValue('Enabled',0) -eq 1){ $guid=[guid]$backup.GetValue('InterfaceGuid'); " +
                         "$a=Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {$_.InterfaceGuid -eq $guid} | Select-Object -First 1; " +
-                        "if($null -ne $a){$d4=[string[]]$backup.GetValue('IPv4');$d6=[string[]]$backup.GetValue('IPv6');$all=@($d4)+@($d6); " +
-                        "if($all.Count -gt 0){Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ServerAddresses $all}else{Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ResetServerAddresses}}; " +
+                        LegacyDnsScriptFragments.RequireAdapterBeforeRestore +
+                        "$d4=[string[]]$backup.GetValue('IPv4');$d6=[string[]]$backup.GetValue('IPv6'); " +
+                        "$dhcp4=[int]$backup.GetValue('DhcpIPv4',0) -eq 1;$dhcp6=[int]$backup.GetValue('DhcpIPv6',0) -eq 1; " +
+                        LegacyDnsScriptFragments.RestoreDnsSettings +
                         "$native=[Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\Dns');$native.SetValue('Enabled',[int]$backup.GetValue('NativeEnabled',0),[Microsoft.Win32.RegistryValueKind]::DWord);$native.SetValue('InterfaceGuid',[string]$backup.GetValue('NativeGuid',''),[Microsoft.Win32.RegistryValueKind]::String);$native.SetValue('Addresses',[string[]]$backup.GetValue('NativeAddresses',@()),[Microsoft.Win32.RegistryValueKind]::MultiString);$native.SetValue('DohTemplate',[string]$backup.GetValue('NativeDoh',''),[Microsoft.Win32.RegistryValueKind]::String);$native.SetValue('Revision',([long]$native.GetValue('Revision',0)+1),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose(); " +
                         "$backup.SetValue('Enabled',0,[Microsoft.Win32.RegistryValueKind]::DWord); }; if($null -ne $backup){$backup.Dispose()}");
                     break;
@@ -438,7 +447,12 @@ public static class AdminCommandRouter
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить sc.exe.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
+        if (!process.WaitForExit(120_000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            process.WaitForExit();
+            throw new TimeoutException("sc.exe не завершился за 120 секунд.");
+        }
         Task.WaitAll(stdout, stderr);
         var output = (stdout.Result + Environment.NewLine + stderr.Result).Trim();
         if (!allowFailure && process.ExitCode != 0)
@@ -840,7 +854,13 @@ public static class AdminCommandRouter
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить PowerShell.");
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
+        if (!process.WaitForExit(600_000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            process.WaitForExit();
+            Task.WaitAll(standardOutput, standardError);
+            throw new TimeoutException("PowerShell не завершился за 10 минут.");
+        }
         Task.WaitAll(standardOutput, standardError);
         if (process.ExitCode != 0)
         {

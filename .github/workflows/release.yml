@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: netshift-release
   cancel-in-progress: false
 
 jobs:
@@ -74,6 +74,36 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not push tag $tag." }
           }
 
+          $newestTag = $null
+          $newestVersion = [Version]::new(0, 0, 0)
+          foreach ($existingTag in (git tag --list 'v*')) {
+            if ($existingTag -match '^v(?<tagVersion>\d+\.\d+\.\d+)$') {
+              $parsedVersion = [Version]::Parse($Matches.tagVersion)
+              if ($parsedVersion -gt $newestVersion) {
+                $newestVersion = $parsedVersion
+                $newestTag = $existingTag
+              }
+            }
+          }
+          if ([Version]::Parse($version) -lt $newestVersion) {
+            Write-Host "Skipping obsolete release $tag because $newestTag is newer."
+            "should_release=false" >> $env:GITHUB_OUTPUT
+            "release_tag=$tag" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          $mainProjectText = git show origin/main:src/NetShift.App/NetShift.App.csproj 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            [xml]$mainProject = $mainProjectText -join "`n"
+            $mainVersion = [string]$mainProject.Project.PropertyGroup.Version
+            if ($mainVersion -match '^\d+\.\d+\.\d+$' -and [Version]::Parse($version) -lt [Version]::Parse($mainVersion)) {
+              Write-Host "Skipping obsolete release $tag because main already contains version $mainVersion."
+              "should_release=false" >> $env:GITHUB_OUTPUT
+              "release_tag=$tag" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
+          }
+
           "should_release=true" >> $env:GITHUB_OUTPUT
           "release_tag=$tag" >> $env:GITHUB_OUTPUT
 
@@ -93,6 +123,10 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
+
+      - name: Run Legacy DNS regression checks
+        shell: pwsh
+        run: dotnet run --project .\tests\NetShift.RegressionChecks\NetShift.RegressionChecks.csproj --configuration Release
 
       - name: Publish self-contained DNS Windows service payload
         shell: pwsh
@@ -224,7 +258,8 @@ jobs:
           }
 
           foreach ($tag in $oldReleaseTags) {
-            if ($tag -and $tag -ne $currentTag) {
+            $currentVersion = [Version]::Parse($currentTag.TrimStart('v'))
+            if ($tag -match '^v(?<oldVersion>\d+\.\d+\.\d+)$' -and [Version]::Parse($Matches.oldVersion) -lt $currentVersion) {
               gh release delete $tag `
                 --repo $repository `
                 --yes `
@@ -246,7 +281,7 @@ jobs:
           foreach ($ref in $versionTagRefs) {
             if ($ref -match '^refs/tags/(v\d+\.\d+\.\d+)$') {
               $tag = $Matches[1]
-              if ($tag -ne $currentTag) {
+              if ($tag -match '^v(?<oldVersion>\d+\.\d+\.\d+)$' -and [Version]::Parse($Matches.oldVersion) -lt [Version]::Parse($currentTag.TrimStart('v'))) {
                 gh api --method DELETE "repos/$repository/git/refs/tags/$tag"
                 if ($LASTEXITCODE -ne 0) {
                   throw "Could not delete old version tag $tag."
