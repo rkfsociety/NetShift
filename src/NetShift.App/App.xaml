@@ -3,14 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnMainWindowClose">
   <Application.Resources>
-    <SolidColorBrush x:Key="CanvasBrush" Color="#0B1220" />
-    <SolidColorBrush x:Key="PanelBrush" Color="#111B2C" />
-    <SolidColorBrush x:Key="PanelRaisedBrush" Color="#172338" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#26364E" />
+    <SolidColorBrush x:Key="CanvasBrush" Color="#091321" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#101D30" />
+    <SolidColorBrush x:Key="PanelRaisedBrush" Color="#16263D" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#263D5B" />
     <SolidColorBrush x:Key="TextBrush" Color="#F1F5F9" />
     <SolidColorBrush x:Key="MutedBrush" Color="#B6C3D6" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#56D6C2" />
-    <SolidColorBrush x:Key="AccentDarkBrush" Color="#113A3A" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#0EA5E9" />
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="#0B3977" />
 
     <Style TargetType="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />

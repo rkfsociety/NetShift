@@ -6,6 +6,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => ApplyDarkTitleBar();
         _trayIcon = CreateTrayIcon();
         Closing += MainWindow_Closing;
         Closed += (_, _) => DisposeTrayIcon();
@@ -89,16 +91,29 @@ public partial class MainWindow : Window
         ZapretPage.Visibility = showDns ? Visibility.Collapsed : Visibility.Visible;
         PageTitleText.Text = showDns ? "DNS" : "zapret";
 
-        var selectedBackground = (System.Windows.Media.Brush)FindResource("AccentDarkBrush");
-        var selectedForeground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        var selectedBackground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(7, 92, 198));
+        var selectedBorder = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(22, 132, 255));
+        var selectedForeground = System.Windows.Media.Brushes.White;
+        var idleBackground = (System.Windows.Media.Brush)FindResource("PanelBrush");
         var idleForeground = (System.Windows.Media.Brush)FindResource("MutedBrush");
-        DnsNavigationButton.Background = showDns ? selectedBackground : System.Windows.Media.Brushes.Transparent;
-        DnsNavigationButton.BorderBrush = showDns ? selectedBackground : System.Windows.Media.Brushes.Transparent;
+        DnsNavigationButton.Background = showDns ? selectedBackground : idleBackground;
+        DnsNavigationButton.BorderBrush = showDns ? selectedBorder : System.Windows.Media.Brushes.Transparent;
         DnsNavigationButton.Foreground = showDns ? selectedForeground : idleForeground;
-        ZapretNavigationButton.Background = showDns ? System.Windows.Media.Brushes.Transparent : selectedBackground;
-        ZapretNavigationButton.BorderBrush = showDns ? System.Windows.Media.Brushes.Transparent : selectedBackground;
+        ZapretNavigationButton.Background = showDns ? idleBackground : selectedBackground;
+        ZapretNavigationButton.BorderBrush = showDns ? System.Windows.Media.Brushes.Transparent : selectedBorder;
         ZapretNavigationButton.Foreground = showDns ? idleForeground : selectedForeground;
     }
+    private void ApplyDarkTitleBar()
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var enabled = 1;
+        if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
+            _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int valueSize);
+
 
     private System.Windows.Forms.NotifyIcon CreateTrayIcon()
     {
@@ -448,8 +463,12 @@ public partial class MainWindow : Window
         if (Ipv4TextBox is null || ProviderComboBox.SelectedItem is not DnsProvider provider) return;
         _settings.DnsProviderName = provider.Name;
         SaveSettings();
-        Ipv4TextBox.Text = provider.Ipv4;
-        Ipv6TextBox.Text = provider.Ipv6;
+        var ipv4 = SplitAddressPair(provider.Ipv4);
+        var ipv6 = SplitAddressPair(provider.Ipv6);
+        Ipv4TextBox.Text = ipv4.Primary;
+        Ipv4AlternateTextBox.Text = ipv4.Alternate;
+        Ipv6TextBox.Text = ipv6.Primary;
+        Ipv6AlternateTextBox.Text = ipv6.Alternate;
         DohTemplateTextBox.Text = provider.DohTemplate ?? string.Empty;
         DohEnabledCheckBox.IsChecked = !string.IsNullOrWhiteSpace(provider.DohTemplate);
     }
@@ -538,7 +557,8 @@ public partial class MainWindow : Window
         if (output is null)
         {
             InstallDnsServiceButton.Visibility = Visibility.Visible;
-            DnsServiceStatusText.Text = "Служба DNS: не установлена · системный DNS остаётся настроенным в Windows";
+            DnsServiceStatusText.Text = "Не установлена";
+            DnsServiceIndicator.Fill = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 181, 71));
             RemoveDnsServiceButton.IsEnabled = false;
             return;
         }
@@ -556,8 +576,20 @@ public partial class MainWindow : Window
             startMode = Convert.ToInt32(key?.GetValue("Start") ?? 3) == 2 ? "автозапуск Windows включён" : "автозапуск Windows выключен";
         }
         catch { }
-        DnsServiceStatusText.Text = $"Служба DNS: {state} · {startMode} · работает независимо от NetShift";
-        if (!IsDnsServiceCurrent()) DnsServiceStatusText.Text += " · доступно обновление";
+        DnsServiceStatusText.Text = state switch
+        {
+            "работает" => startMode.Contains("включён", StringComparison.Ordinal) ? "Работает · автозапуск Windows" : "Работает · автозапуск выключен",
+            "остановлена" => "Остановлена",
+            "запускается" => "Запускается",
+            "останавливается" => "Останавливается",
+            _ => "Установлена"
+        };
+        DnsServiceIndicator.Fill = state == "работает"
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(23, 217, 130))
+            : state is "запускается" or "останавливается"
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 181, 71))
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(235, 82, 82));
+        if (!IsDnsServiceCurrent()) DnsServiceStatusText.Text += " · обновить";
         RemoveDnsServiceButton.IsEnabled = true;
     }
 
@@ -734,8 +766,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var ipv4Addresses = SplitAddresses(Ipv4TextBox.Text);
-        var ipv6Addresses = SupportIPv6CheckBox.IsChecked == true ? SplitAddresses(Ipv6TextBox.Text) : [];
+        var ipv4Addresses = SplitAddresses($"{Ipv4TextBox.Text},{Ipv4AlternateTextBox.Text}");
+        var ipv6Addresses = SupportIPv6CheckBox.IsChecked == true
+            ? SplitAddresses($"{Ipv6TextBox.Text},{Ipv6AlternateTextBox.Text}")
+            : [];
         var addresses = ipv4Addresses.Concat(ipv6Addresses).ToArray();
         var legacyMode = LegacyModeRadio.IsChecked == true;
         var dohTemplate = DohTemplateTextBox.Text.Trim();
@@ -855,6 +889,12 @@ public partial class MainWindow : Window
     private static IEnumerable<string> SplitAddresses(string value) => value
         .Split([',', ';', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(address => IPAddress.TryParse(address, out var parsed) ? parsed.ToString() : address);
+    private static (string Primary, string Alternate) SplitAddressPair(string value)
+    {
+        var addresses = value.Split([',', ';', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return (addresses.ElementAtOrDefault(0) ?? string.Empty, addresses.ElementAtOrDefault(1) ?? string.Empty);
+    }
+
 
     private static bool HasFamily(IEnumerable<string> addresses, AddressFamily expectedFamily) =>
         addresses.All(address => IPAddress.TryParse(address, out var parsed) && parsed.AddressFamily == expectedFamily);
