@@ -552,7 +552,7 @@ public partial class MainWindow : Window
     {
         if (NetShiftUpdateService.Repository is null)
         {
-            UpdateStatusText.Text = $"NetShift {NetShiftUpdateService.CurrentVersion} · автообновление настроено для GitHub-релиза";
+            UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion}";
             UpdateButton.Content = "Обновление в релизной сборке";
             UpdateButton.IsEnabled = false;
             return;
@@ -565,12 +565,12 @@ public partial class MainWindow : Window
             _availableUpdate = await NetShiftUpdateService.CheckLatestAsync(CancellationToken.None);
             if (_availableUpdate is null)
             {
-                UpdateStatusText.Text = $"NetShift {NetShiftUpdateService.CurrentVersion} · установлена последняя версия";
+                UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion}";
                 UpdateButton.Content = "Проверить обновления";
             }
             else
             {
-                UpdateStatusText.Text = $"Доступно обновление NetShift {_availableUpdate.Tag}";
+                UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion} · доступно обновление {_availableUpdate.Version}";
                 UpdateButton.Content = $"Скачать и установить {_availableUpdate.Tag}";
             }
         }
