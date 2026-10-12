@@ -8,13 +8,14 @@
     <SolidColorBrush x:Key="PanelRaisedBrush" Color="#172338" />
     <SolidColorBrush x:Key="BorderBrush" Color="#26364E" />
     <SolidColorBrush x:Key="TextBrush" Color="#F1F5F9" />
-    <SolidColorBrush x:Key="MutedBrush" Color="#91A0B5" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#B6C3D6" />
     <SolidColorBrush x:Key="AccentBrush" Color="#56D6C2" />
     <SolidColorBrush x:Key="AccentDarkBrush" Color="#113A3A" />
 
     <Style TargetType="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="14" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, Path=IsHighlighted}" Value="True">
           <Setter Property="Foreground" Value="#07151A" />
@@ -32,6 +33,16 @@
       <Setter Property="Padding" Value="11,9" />
       <Setter Property="FontSize" Value="14" />
       <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="14" />
     </Style>
     <Style TargetType="ComboBox">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -159,7 +170,9 @@
                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.84" />
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
+                <Setter TargetName="ButtonBorder" Property="Background" Value="#1B2638" />
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#344258" />
+                <Setter Property="Foreground" Value="#B6C3D6" />
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
