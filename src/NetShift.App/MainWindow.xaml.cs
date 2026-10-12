@@ -82,6 +82,24 @@ public partial class MainWindow : Window
         RefreshZapretFolder();
     }
 
+    private void NavigatePage_Click(object sender, RoutedEventArgs e)
+    {
+        var showDns = string.Equals((sender as FrameworkElement)?.Tag?.ToString(), "dns", StringComparison.Ordinal);
+        DnsPage.Visibility = showDns ? Visibility.Visible : Visibility.Collapsed;
+        ZapretPage.Visibility = showDns ? Visibility.Collapsed : Visibility.Visible;
+        PageTitleText.Text = showDns ? "DNS" : "zapret";
+
+        var selectedBackground = (System.Windows.Media.Brush)FindResource("AccentDarkBrush");
+        var selectedForeground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        var idleForeground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        DnsNavigationButton.Background = showDns ? selectedBackground : System.Windows.Media.Brushes.Transparent;
+        DnsNavigationButton.BorderBrush = showDns ? selectedBackground : System.Windows.Media.Brushes.Transparent;
+        DnsNavigationButton.Foreground = showDns ? selectedForeground : idleForeground;
+        ZapretNavigationButton.Background = showDns ? System.Windows.Media.Brushes.Transparent : selectedBackground;
+        ZapretNavigationButton.BorderBrush = showDns ? System.Windows.Media.Brushes.Transparent : selectedBackground;
+        ZapretNavigationButton.Foreground = showDns ? idleForeground : selectedForeground;
+    }
+
     private System.Windows.Forms.NotifyIcon CreateTrayIcon()
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
