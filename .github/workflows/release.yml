@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   release:
+    # Deleting older version tags also creates push events. Ignore those.
+    if: github.event.deleted == false
     runs-on: windows-latest
     steps:
       - name: Check out source
@@ -71,12 +73,69 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME `
-            $env:RELEASE_ARCHIVE `
-            $env:RELEASE_CHECKSUM `
-            --verify-tag `
-            --title "NetShift $env:GITHUB_REF_NAME" `
-            --generate-notes
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $env:RELEASE_ARCHIVE $env:RELEASE_CHECKSUM `
+              --repo $env:GITHUB_REPOSITORY `
+              --clobber
+          } else {
+            gh release create $tag `
+              $env:RELEASE_ARCHIVE `
+              $env:RELEASE_CHECKSUM `
+              --repo $env:GITHUB_REPOSITORY `
+              --verify-tag `
+              --title "NetShift $tag" `
+              --generate-notes
+          }
           if ($LASTEXITCODE -ne 0) {
             throw 'GitHub release creation failed.'
+          }
+
+      - name: Keep only the newest release and version tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repository = $env:GITHUB_REPOSITORY
+          $currentTag = $env:GITHUB_REF_NAME
+          $oldReleaseTags = gh release list `
+            --repo $repository `
+            --limit 1000 `
+            --json tagName `
+            --template '{{range .}}{{.tagName}}{{"\n"}}{{end}}'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not list GitHub releases.'
+          }
+
+          foreach ($tag in $oldReleaseTags) {
+            if ($tag -and $tag -ne $currentTag) {
+              gh release delete $tag `
+                --repo $repository `
+                --yes `
+                --cleanup-tag
+              if ($LASTEXITCODE -ne 0) {
+                throw "Could not delete old release $tag."
+              }
+            }
+          }
+
+          # Also remove orphaned version tags that do not have a release.
+          $versionTagRefs = gh api --paginate `
+            "repos/$repository/git/matching-refs/tags/v" `
+            --template '{{range .}}{{.ref}}{{"\n"}}{{end}}'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not list version tags.'
+          }
+
+          foreach ($ref in $versionTagRefs) {
+            if ($ref -match '^refs/tags/(v\d+\.\d+\.\d+)$') {
+              $tag = $Matches[1]
+              if ($tag -ne $currentTag) {
+                gh api --method DELETE "repos/$repository/git/refs/tags/$tag"
+                if ($LASTEXITCODE -ne 0) {
+                  throw "Could not delete old version tag $tag."
+                }
+              }
+            }
           }

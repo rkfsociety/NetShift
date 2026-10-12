@@ -32,7 +32,7 @@ dotnet run --project .\src\NetShift.App\NetShift.App.csproj
 
 ## Выпуск и обновление NetShift
 
-Публикация тега `vMAJOR.MINOR.PATCH` запускает [.github/workflows/release.yml](.github/workflows/release.yml). Workflow собирает самодостаточный `win-x64` EXE, создаёт `NetShift-vX.Y.Z-win-x64.zip`, публикует SHA-256 файл и создаёт GitHub Release с автоматически подготовленными заметками. Например, первый выпуск запускается командой `git tag v0.1.0; git push origin v0.1.0`.
+Публикация тега `vMAJOR.MINOR.PATCH` запускает [.github/workflows/release.yml](.github/workflows/release.yml). Workflow собирает самодостаточный `win-x64` EXE, создаёт `NetShift-vX.Y.Z-win-x64.zip`, публикует SHA-256 файл и создаёт GitHub Release с автоматически подготовленными заметками. После публикации workflow удаляет предыдущие релизы и все старые версионные теги `vMAJOR.MINOR.PATCH`, оставляя только текущую версию. Например, первый выпуск запускается командой `git tag v0.1.0; git push origin v0.1.0`.
 
 Релизная сборка знает адрес своего GitHub-репозитория и проверяет последний стабильный релиз при запуске. Если версия новее, NetShift предлагает скачать и установить её. Перед установкой приложение сверяет ZIP с SHA-256 из релиза, затем заменяет EXE после закрытия окна и запускает обновлённую версию. Локальные сборки без метаданных GitHub показывают, что проверка доступна в опубликованных релизах.
 
