@@ -53,10 +53,11 @@ public static class AdminCommandRouter
                     }
                     dnsApplyScript.Append($"$adapter = Get-NetAdapter -InterfaceIndex {interfaceIndex} -ErrorAction Stop; ")
                         .Append($"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ServerAddresses @({string.Join(",", addresses.Select(PsLiteral))}); ")
+                        .Append("$interfaceGuid = ([guid]$adapter.InterfaceGuid).ToString('D'); ")
                         .Append("$key = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\Dns'); ")
                         .Append("$revision = [long]$key.GetValue('Revision', 0); ")
                         .Append("$key.SetValue('Enabled', 1, [Microsoft.Win32.RegistryValueKind]::DWord); ")
-                        .Append("$key.SetValue('InterfaceGuid', $adapter.InterfaceGuid.ToString('D'), [Microsoft.Win32.RegistryValueKind]::String); ")
+                        .Append("$key.SetValue('InterfaceGuid', $interfaceGuid.ToString('D'), [Microsoft.Win32.RegistryValueKind]::String); ")
                         .Append("$key.SetValue('Addresses', [string[]]@(").Append(string.Join(",", addresses.Select(PsLiteral))).Append("), [Microsoft.Win32.RegistryValueKind]::MultiString); ")
                         .Append("$key.SetValue('DohTemplate', ").Append(PsLiteral(dohTemplate)).Append(", [Microsoft.Win32.RegistryValueKind]::String); ")
                         .Append("$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord); $key.Dispose()");
@@ -68,8 +69,9 @@ public static class AdminCommandRouter
                         throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
                     RunPowerShell($"$adapter = Get-NetAdapter -InterfaceIndex {interfaceIndex} -ErrorAction Stop; " +
                         $"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ResetServerAddresses; " +
+                        "$interfaceGuid = ([guid]$adapter.InterfaceGuid).ToString('D'); " +
                         "$key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns', $true); " +
-                        "if ($null -ne $key -and [string]::Equals([string]$key.GetValue('InterfaceGuid'), $adapter.InterfaceGuid.ToString('D'), [StringComparison]::OrdinalIgnoreCase)) { " +
+                        "if ($null -ne $key -and [string]::Equals([string]$key.GetValue('InterfaceGuid'), $interfaceGuid, [StringComparison]::OrdinalIgnoreCase)) { " +
                         "$revision = [long]$key.GetValue('Revision', 0); $key.SetValue('Enabled', 0, [Microsoft.Win32.RegistryValueKind]::DWord); " +
                         "$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) }; if ($null -ne $key) { $key.Dispose() }");
                     break;
