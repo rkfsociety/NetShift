@@ -26,12 +26,49 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish self-contained Windows app
+      - name: Publish self-contained DNS Windows service payload
         shell: pwsh
         run: |
           $tag = $env:GITHUB_REF_NAME
           if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
-            throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.1.0."
+            throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.1."
+          }
+
+          $publishDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/dns-service-publish'
+          New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
+
+          $serviceVersion = (dotnet msbuild .\src\NetShift.DnsService\DnsService.csproj -getProperty:Version -nologo).Trim()
+          if ($LASTEXITCODE -ne 0 -or $serviceVersion -notmatch '^\d+\.\d+\.\d+') {
+            throw 'Could not read the DNS service payload version.'
+          }
+
+          dotnet publish .\src\NetShift.DnsService\DnsService.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output $publishDirectory `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false
+          if ($LASTEXITCODE -ne 0) {
+            throw 'DNS service dotnet publish failed.'
+          }
+
+          $serviceExecutable = Join-Path $publishDirectory 'NetShift.DnsService.exe'
+          if (-not (Test-Path -LiteralPath $serviceExecutable -PathType Leaf)) {
+            throw 'The DNS service publish output does not contain NetShift.DnsService.exe.'
+          }
+
+          Add-Content -Path $env:GITHUB_ENV -Value "DNS_SERVICE_EXECUTABLE=$serviceExecutable"
+          Add-Content -Path $env:GITHUB_ENV -Value "DNS_SERVICE_VERSION=$serviceVersion"
+
+      - name: Publish self-installing Windows app
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.1."
           }
 
           $version = $Matches.version
@@ -48,7 +85,9 @@ jobs:
             -p:DebugType=None `
             -p:DebugSymbols=false `
             "-p:Version=$version" `
-            "-p:NetShiftUpdateRepository=$env:GITHUB_REPOSITORY"
+            "-p:NetShiftUpdateRepository=$env:GITHUB_REPOSITORY" `
+            "-p:NetShiftDnsServicePath=$env:DNS_SERVICE_EXECUTABLE" `
+            "-p:NetShiftDnsServiceVersion=$env:DNS_SERVICE_VERSION"
           if ($LASTEXITCODE -ne 0) {
             throw 'dotnet publish failed.'
           }
@@ -58,6 +97,10 @@ jobs:
             throw 'The publish output does not contain NetShift.exe.'
           }
 
+          $executableChecksum = "$executable.sha256"
+          $executableHash = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText($executableChecksum, "$executableHash  NetShift.exe`n", [System.Text.UTF8Encoding]::new($false))
+
           $archiveName = "NetShift-$tag-win-x64.zip"
           $archivePath = Join-Path $env:GITHUB_WORKSPACE $archiveName
           $checksumPath = "$archivePath.sha256"
@@ -65,49 +108,10 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
           [System.IO.File]::WriteAllText($checksumPath, "$hash  $archiveName`n", [System.Text.UTF8Encoding]::new($false))
 
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_EXECUTABLE=$executable"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_EXECUTABLE_CHECKSUM=$executableChecksum"
           Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_ARCHIVE=$archivePath"
           Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_CHECKSUM=$checksumPath"
-
-      - name: Publish self-contained DNS Windows service
-        shell: pwsh
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
-            throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.0."
-          }
-
-          $version = $Matches.version
-          $publishDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/dns-service-publish'
-          New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
-
-          dotnet publish .\src\NetShift.DnsService\DnsService.csproj `
-            --configuration Release `
-            --runtime win-x64 `
-            --self-contained true `
-            --output $publishDirectory `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:DebugType=None `
-            -p:DebugSymbols=false `
-            "-p:Version=$version"
-          if ($LASTEXITCODE -ne 0) {
-            throw 'DNS service dotnet publish failed.'
-          }
-
-          $executable = Join-Path $publishDirectory 'NetShift.DnsService.exe'
-          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-            throw 'The DNS service publish output does not contain NetShift.DnsService.exe.'
-          }
-
-          $archiveName = "NetShift.DnsService-$tag-win-x64.zip"
-          $archivePath = Join-Path $env:GITHUB_WORKSPACE $archiveName
-          $checksumPath = "$archivePath.sha256"
-          Compress-Archive -LiteralPath $executable -DestinationPath $archivePath -CompressionLevel Optimal
-          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-          [System.IO.File]::WriteAllText($checksumPath, "$hash  $archiveName`n", [System.Text.UTF8Encoding]::new($false))
-
-          Add-Content -Path $env:GITHUB_ENV -Value "DNS_SERVICE_ARCHIVE=$archivePath"
-          Add-Content -Path $env:GITHUB_ENV -Value "DNS_SERVICE_CHECKSUM=$checksumPath"
 
       - name: Create GitHub release and upload assets
         shell: pwsh
@@ -117,15 +121,15 @@ jobs:
           $tag = $env:GITHUB_REF_NAME
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $env:RELEASE_ARCHIVE $env:RELEASE_CHECKSUM $env:DNS_SERVICE_ARCHIVE $env:DNS_SERVICE_CHECKSUM `
+            gh release upload $tag $env:RELEASE_EXECUTABLE $env:RELEASE_EXECUTABLE_CHECKSUM $env:RELEASE_ARCHIVE $env:RELEASE_CHECKSUM `
               --repo $env:GITHUB_REPOSITORY `
               --clobber
           } else {
             gh release create $tag `
+              $env:RELEASE_EXECUTABLE `
+              $env:RELEASE_EXECUTABLE_CHECKSUM `
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_CHECKSUM `
-              $env:DNS_SERVICE_ARCHIVE `
-              $env:DNS_SERVICE_CHECKSUM `
               --repo $env:GITHUB_REPOSITORY `
               --verify-tag `
               --title "NetShift $tag" `

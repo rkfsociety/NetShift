@@ -5,6 +5,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -72,9 +73,8 @@ public static class AdminCommandRouter
                         "$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) }; if ($null -ne $key) { $key.Dispose() }");
                     break;
 
-                case "dns-service-install":
-                    if (args.Length < 4) throw new InvalidOperationException("Не переданы ZIP службы DNS и контрольная сумма.");
-                    InstallDnsService(args[2], args[3]);
+                case "dns-service-install-embedded":
+                    InstallEmbeddedDnsService();
                     break;
 
                 case "dns-service-remove":
@@ -570,29 +570,25 @@ public static class AdminCommandRouter
         File.Copy(fullBackup, hostsPath, overwrite: true);
     }
 
-    private static void InstallDnsService(string archivePath, string expectedHash)
+    private static void InstallEmbeddedDnsService()
     {
-        var fullArchive = VerifyDownloadedFile(archivePath, expectedHash, ".zip");
+        const string resourceName = "NetShift.App.Payload.NetShift.DnsService.exe";
+        using var payload = typeof(AdminCommandRouter).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException("В этой сборке не встроен файл DNS-службы. Установите актуальный релиз NetShift.");
+        InstallDnsService(payload);
+    }
+
+    private static void InstallDnsService(Stream payload)
+    {
         var serviceDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NetShift", "DnsService");
         var target = Path.Combine(serviceDirectory, "NetShift.DnsService.exe");
         var staging = target + ".new-" + Guid.NewGuid().ToString("N");
         var backup = target + ".backup";
         Directory.CreateDirectory(serviceDirectory);
-
-        try
-        {
-            using var archive = ZipFile.OpenRead(fullArchive);
-            if (archive.Entries.Count != 1 ||
-                !archive.Entries[0].FullName.Equals("NetShift.DnsService.exe", StringComparison.OrdinalIgnoreCase) ||
-                archive.Entries[0].Length <= 0 || archive.Entries[0].Length > 200L * 1024 * 1024)
-                throw new InvalidDataException("ZIP службы должен содержать только NetShift.DnsService.exe.");
-            archive.Entries[0].ExtractToFile(staging, overwrite: false);
-        }
-        catch
-        {
-            try { if (File.Exists(staging)) File.Delete(staging); } catch { }
-            throw;
-        }
+        if (payload.CanSeek && (payload.Length <= 0 || payload.Length > 200L * 1024 * 1024))
+            throw new InvalidDataException("Встроенный файл DNS-службы имеет недопустимый размер.");
+        using (var output = new FileStream(staging, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            payload.CopyTo(output);
 
         var serviceQuery = RunSc(["query", "NetShiftDns"], allowFailure: true);
         var wasInstalled = serviceQuery.ExitCode == 0;
@@ -624,6 +620,13 @@ public static class AdminCommandRouter
             RunSc(["failure", "NetShiftDns", "reset=", "86400", "actions=", "restart/5000/restart/15000/restart/30000"], allowFailure: true);
             RunSc(["start", "NetShiftDns"]);
             WaitForServiceState("NetShiftDns", "RUNNING");
+            using (var payloadKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\NetShift\DnsService"))
+            {
+                var payloadVersion = typeof(AdminCommandRouter).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .FirstOrDefault(attribute => attribute.Key.Equals("NetShiftDnsServiceVersion", StringComparison.Ordinal))?.Value;
+                if (!string.IsNullOrWhiteSpace(payloadVersion))
+                    payloadKey?.SetValue("Version", payloadVersion, RegistryValueKind.String);
+            }
             if (File.Exists(backup)) File.Delete(backup);
         }
         catch
@@ -667,6 +670,7 @@ public static class AdminCommandRouter
         if (File.Exists(executable)) File.Delete(executable);
         if (Directory.Exists(serviceDirectory) && !Directory.EnumerateFileSystemEntries(serviceDirectory).Any())
             Directory.Delete(serviceDirectory);
+        Registry.LocalMachine.DeleteSubKeyTree(@"SOFTWARE\NetShift\DnsService", throwOnMissingSubKey: false);
         // DNS stays configured in Windows after removing the service.
     }
 

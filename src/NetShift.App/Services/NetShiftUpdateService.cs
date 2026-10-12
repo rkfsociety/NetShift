@@ -11,9 +11,6 @@ using System.Text.RegularExpressions;
 namespace NetShift.App.Services;
 
 public sealed record NetShiftUpdate(string Tag, string Version, string ArchiveName, string ArchiveUrl, string ChecksumUrl, long ArchiveSize, string? ApiSha256);
-public sealed record NetShiftDnsServicePackage(string Tag, string ArchiveName, string ArchiveUrl, string ChecksumUrl, long ArchiveSize, string? ApiSha256);
-public sealed record DownloadedNetShiftDnsService(string ArchivePath, string Sha256);
-
 public static class NetShiftUpdateService
 {
     private const long MaxArchiveBytes = 400L * 1024 * 1024;
@@ -32,7 +29,7 @@ public static class NetShiftUpdateService
         get
         {
             var value = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            return string.IsNullOrWhiteSpace(value) ? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.3.0" : value;
+            return string.IsNullOrWhiteSpace(value) ? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.3.1" : value;
         }
     }
 
@@ -93,106 +90,6 @@ public static class NetShiftUpdateService
         }
 
         return new NetShiftUpdate(tag, latestVersion.ToString(), archiveName, archiveUrl, checksumUrl, archiveSize, apiSha256);
-    }
-
-    public static async Task<NetShiftDnsServicePackage> GetLatestDnsServicePackageAsync(CancellationToken cancellationToken)
-    {
-        var repository = Repository ?? throw new InvalidOperationException("В этой сборке не задан GitHub-репозиторий NetShift.");
-        using var response = await Client.GetAsync($"https://api.github.com/repos/{repository}/releases/latest", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        var root = document.RootElement;
-        var tag = RequiredString(root, "tag_name");
-        _ = ParseVersion(tag);
-        var archiveName = $"NetShift.DnsService-{tag}-win-x64.zip";
-        var checksumName = archiveName + ".sha256";
-        if (!root.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
-            throw new InvalidDataException("В релизе NetShift не найден список файлов.");
-
-        JsonElement archiveAsset = default;
-        JsonElement checksumAsset = default;
-        foreach (var asset in assets.EnumerateArray())
-        {
-            var name = RequiredString(asset, "name");
-            if (name.Equals(archiveName, StringComparison.OrdinalIgnoreCase)) archiveAsset = asset;
-            else if (name.Equals(checksumName, StringComparison.OrdinalIgnoreCase)) checksumAsset = asset;
-        }
-        if (archiveAsset.ValueKind == JsonValueKind.Undefined || checksumAsset.ValueKind == JsonValueKind.Undefined)
-            throw new InvalidDataException($"В релизе {tag} не найден архив DNS-службы или его контрольная сумма.");
-
-        var archiveUrl = ValidateReleaseAssetUrl(RequiredString(archiveAsset, "browser_download_url"), repository, tag);
-        var checksumUrl = ValidateReleaseAssetUrl(RequiredString(checksumAsset, "browser_download_url"), repository, tag);
-        var archiveSize = archiveAsset.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var size) ? size : 0;
-        if (archiveSize <= 0 || archiveSize > MaxArchiveBytes)
-            throw new InvalidDataException("Размер ZIP-архива DNS-службы недопустим.");
-
-        string? apiSha256 = null;
-        if (archiveAsset.TryGetProperty("digest", out var digestElement) && digestElement.ValueKind == JsonValueKind.String)
-        {
-            var digestMatch = Regex.Match(digestElement.GetString() ?? string.Empty, "^sha256:([0-9a-fA-F]{64})$", RegexOptions.CultureInvariant);
-            if (digestMatch.Success) apiSha256 = digestMatch.Groups[1].Value.ToLowerInvariant();
-        }
-        return new NetShiftDnsServicePackage(tag, archiveName, archiveUrl, checksumUrl, archiveSize, apiSha256);
-    }
-
-    public static async Task<DownloadedNetShiftDnsService> DownloadDnsServicePackageAsync(
-        NetShiftDnsServicePackage package, IProgress<double>? progress, CancellationToken cancellationToken)
-    {
-        var checksumText = await Client.GetStringAsync(package.ChecksumUrl, cancellationToken);
-        if (checksumText.Length > 4096)
-            throw new InvalidDataException("Файл контрольной суммы DNS-службы неожиданно велик.");
-        var checksumMatch = Regex.Match(checksumText.Trim(), $"^(?<hash>[0-9a-fA-F]{{64}})\\s+\\*?{Regex.Escape(package.ArchiveName)}$", RegexOptions.CultureInvariant);
-        if (!checksumMatch.Success)
-            throw new InvalidDataException("Файл контрольной суммы не соответствует архиву DNS-службы.");
-        var expectedHash = checksumMatch.Groups["hash"].Value.ToLowerInvariant();
-        if (package.ApiSha256 is not null && !package.ApiSha256.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Контрольные суммы из GitHub API и файла DNS-службы не совпадают.");
-
-        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "Downloads");
-        Directory.CreateDirectory(downloads);
-        var archivePath = Path.Combine(downloads, package.ArchiveName);
-        var temporaryPath = archivePath + ".download";
-        try
-        {
-            using var response = await Client.GetAsync(package.ArchiveUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            if (response.Content.Headers.ContentLength is long contentLength && contentLength != package.ArchiveSize)
-                throw new InvalidDataException("Размер архива DNS-службы не совпадает с данными GitHub.");
-
-            await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var output = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-            {
-                var buffer = new byte[81920];
-                long total = 0;
-                int read;
-                while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
-                {
-                    total += read;
-                    if (total > MaxArchiveBytes || total > package.ArchiveSize)
-                        throw new InvalidDataException("Загруженный ZIP-архив DNS-службы превышает объявленный размер.");
-                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    progress?.Report((double)total / package.ArchiveSize);
-                }
-                if (total != package.ArchiveSize)
-                    throw new InvalidDataException("Загруженный ZIP-архив DNS-службы имеет неполный размер.");
-            }
-
-            await using (var archiveStream = File.OpenRead(temporaryPath))
-            {
-                var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(archiveStream, cancellationToken));
-                if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("SHA-256 ZIP-архива DNS-службы не совпал.");
-            }
-            File.Move(temporaryPath, archivePath, overwrite: true);
-            progress?.Report(1);
-            return new DownloadedNetShiftDnsService(archivePath, expectedHash);
-        }
-        catch
-        {
-            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-            throw;
-        }
     }
 
     public static async Task<string> DownloadAndExtractAsync(NetShiftUpdate update, IProgress<double>? progress, CancellationToken cancellationToken)

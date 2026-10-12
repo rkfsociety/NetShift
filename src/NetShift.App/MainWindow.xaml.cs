@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Collections.ObjectModel;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -65,7 +66,7 @@ public partial class MainWindow : Window
         FakeTargetComboBox.SelectedIndex = 0;
         LoadSettings();
         AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
-        InstallDnsServiceButton.IsEnabled = NetShiftUpdateService.Repository is not null;
+        InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         RefreshDnsServiceStatus();
         RefreshAdapters(selectFirst: true);
         RefreshZapretFolder();
@@ -412,6 +413,15 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        if (NetShiftBootstrapper.HasEmbeddedDnsService() && !IsDnsServiceCurrent())
+        {
+            DnsServiceStatusText.Text = QueryWindowsService("NetShiftDns") is null
+                ? "Первый запуск: устанавливаю службу DNS. Windows попросит подтвердить системную службу."
+                : "Обновляю DNS-службу. Текущие DNS-адреса в Windows останутся активны.";
+            RunElevatedWorker("dns-service-install-embedded");
+            RefreshDnsServiceStatus();
+        }
+
         await Task.WhenAll(
             RefreshDnsAiProviderAsync(showError: false),
             CheckNetShiftUpdatesAsync(showError: false));
@@ -460,7 +470,7 @@ public partial class MainWindow : Window
     {
         if (DnsServiceStatusText is null) return;
         var output = QueryWindowsService("NetShiftDns");
-        InstallDnsServiceButton.IsEnabled = NetShiftUpdateService.Repository is not null;
+        InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         if (output is null)
         {
             DnsServiceStatusText.Text = "Служба DNS: не установлена · системный DNS остаётся настроенным в Windows";
@@ -481,26 +491,37 @@ public partial class MainWindow : Window
         }
         catch { }
         DnsServiceStatusText.Text = $"Служба DNS: {state} · {startMode} · работает независимо от NetShift";
+        if (!IsDnsServiceCurrent()) DnsServiceStatusText.Text += " · доступно обновление";
         RemoveDnsServiceButton.IsEnabled = true;
+    }
+
+    private static bool IsDnsServiceCurrent()
+    {
+        if (!NetShiftBootstrapper.HasEmbeddedDnsService()) return true;
+        var expectedVersion = typeof(MainWindow).Assembly.GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key.Equals("NetShiftDnsServiceVersion", StringComparison.Ordinal))?.Value;
+        if (string.IsNullOrWhiteSpace(expectedVersion)) return false;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\NetShift\DnsService");
+            return string.Equals(key?.GetValue("Version") as string, expectedVersion, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
     }
 
     private async void InstallDnsService_Click(object sender, RoutedEventArgs e)
     {
-        if (NetShiftUpdateService.Repository is null)
+        if (!NetShiftBootstrapper.HasEmbeddedDnsService())
         {
-            MessageBox.Show(this, "Установка службы доступна в релизной сборке NetShift.", "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "В этой сборке нет встроенного файла DNS-службы. Скачайте приложение из релиза NetShift.", "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         InstallDnsServiceButton.IsEnabled = false;
         try
         {
-            DnsServiceStatusText.Text = "Проверяю DNS-службу в последнем релизе NetShift…";
-            var package = await NetShiftUpdateService.GetLatestDnsServicePackageAsync(CancellationToken.None);
-            var progress = new Progress<double>(value => DnsServiceStatusText.Text = $"Скачиваю DNS-службу {package.Tag}: {value:P0}");
-            var downloaded = await NetShiftUpdateService.DownloadDnsServicePackageAsync(package, progress, CancellationToken.None);
-            DnsServiceStatusText.Text = "Архив проверен по SHA-256. Windows запросит права администратора для установки автозапускающейся службы.";
-            if (RunElevatedWorker("dns-service-install", downloaded.ArchivePath, downloaded.Sha256))
+            DnsServiceStatusText.Text = "Устанавливаю встроенную DNS-службу. Windows запросит права администратора.";
+            if (RunElevatedWorker("dns-service-install-embedded"))
                 DnsServiceStatusText.Text = "DNS-служба установлена и настроена на автоматический запуск вместе с Windows.";
         }
         catch (Exception error)

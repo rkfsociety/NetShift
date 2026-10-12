@@ -13,6 +13,12 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (NetShiftBootstrapper.TryStartInstalledCopy(e.Args))
+        {
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
         var window = new MainWindow();
         MainWindow = window;
