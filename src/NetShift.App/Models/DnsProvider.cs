@@ -14,6 +14,7 @@ public sealed record DnsProvider(string Name, string Ipv4, string Ipv6, string? 
         new("Google Public DNS", "8.8.8.8, 8.8.4.4", "2001:4860:4860::8888, 2001:4860:4860::8844"),
         new("Quad9", "9.9.9.9, 149.112.112.112", "2620:fe::fe, 2620:fe::9"),
         new("AdGuard DNS", "94.140.14.14, 94.140.15.15", "2a10:50c0::ad1:ff, 2a10:50c0::ad2:ff"),
+        new("Comss.one", "83.220.169.155, 212.109.195.93", "", "https://dns.comss.one/dns-query"),
         new("Xbox DNS", "111.88.96.54, 111.88.96.55", "2a00:ab00:1233:26::50, 2a00:ab00:1233:26::51", "https://xbox-dns.ru/dns-query"),
         DnsAi,
         new("Свой DNS", "", "")
