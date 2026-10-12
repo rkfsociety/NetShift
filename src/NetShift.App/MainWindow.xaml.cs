@@ -527,7 +527,11 @@ public partial class MainWindow : Window
             if (await IsZapretServiceRunningAsync())
                 await CheckActiveZapretStrategyAsync(isInitialCheck: true);
             else
+            {
                 ZapretHealthStatusText.Text = "Первичная проверка zapret выполнится, когда его служба будет запущена.";
+                ZapretTestPhaseText.Text = "Ожидает запуска zapret";
+                ZapretTestStrategyText.Text = "Проверяются Discord, YouTube и Google через активную службу. Другие стратегии не запускаются.";
+            }
         }
     }
 
@@ -1042,6 +1046,13 @@ public partial class MainWindow : Window
         if (!await IsZapretServiceRunningAsync())
         {
             ZapretHealthStatusText.Text = "Проверка доступна только для запущенной службы zapret; служба DNS не затрагивается.";
+            ZapretTestPhaseText.Text = "Служба не запущена";
+            ZapretTestPhaseText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+            ZapretTestStrategyText.Text = "Проверяются Discord, YouTube и Google через активную службу. Другие стратегии не запускаются.";
+            ZapretTestProgressBar.Visibility = Visibility.Collapsed;
+            SetZapretTargetStatus("Discord", "Ожидает", System.Windows.Media.Brushes.Gray);
+            SetZapretTargetStatus("YouTube", "Ожидает", System.Windows.Media.Brushes.Gray);
+            SetZapretTargetStatus("Google", "Ожидает", System.Windows.Media.Brushes.Gray);
             return;
         }
 
@@ -1066,18 +1077,29 @@ public partial class MainWindow : Window
         if (activeStrategyPath is null)
         {
             ZapretHealthStatusText.Text = "Не удалось определить стратегию работающей службы zapret.";
+            ZapretTestPhaseText.Text = "Стратегия не определена";
+            ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.IndianRed;
+            ZapretTestStrategyText.Text = "Не удалось прочитать путь активной стратегии из конфигурации службы.";
             return;
         }
 
         CheckActiveStrategyButton.IsEnabled = false;
-        ZapretHealthStatusText.Text = "Проверяю доступ к Discord, YouTube и Google через активную стратегию…";
+        var displayStrategyName = Path.GetFileNameWithoutExtension(activeStrategyPath);
+        ZapretHealthStatusText.Text = $"Проверяю доступность Discord, YouTube и Google через {displayStrategyName}…";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        ZapretTestPhaseText.Text = "Проверка выполняется";
+        ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+        ZapretTestStrategyText.Text = $"Активная стратегия: {displayStrategyName}. Служба не останавливается, другие варианты не запускаются.";
+        ZapretTestProgressBar.Visibility = Visibility.Visible;
+        SetZapretTargetStatus("Discord", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
+        SetZapretTargetStatus("YouTube", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
+        SetZapretTargetStatus("Google", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
         try
         {
             var results = await Task.WhenAll(
-                ProbeZapretTargetAsync("Discord", "https://discord.com"),
-                ProbeZapretTargetAsync("YouTube", "https://www.youtube.com"),
-                ProbeZapretTargetAsync("Google", "https://www.google.com"));
+                ProbeZapretTargetWithStatusAsync("Discord", "https://discord.com"),
+                ProbeZapretTargetWithStatusAsync("YouTube", "https://www.youtube.com"),
+                ProbeZapretTargetWithStatusAsync("Google", "https://www.google.com"));
             var healthy = results.All(result => result.Reachable);
             _settings.ZapretStrategyHealth[HealthKey(activeStrategyPath)] = healthy;
             if (isInitialCheck) _settings.InitialZapretCheckCompleted = true;
@@ -1087,16 +1109,21 @@ public partial class MainWindow : Window
             var passed = results.Where(result => result.Reachable).Select(result => result.Name).ToArray();
             var failed = results.Where(result => !result.Reachable).Select(result => result.Name).ToArray();
             ZapretHealthStatusText.Text = failed.Length == 0
-                ? $"Активная стратегия {Path.GetFileNameWithoutExtension(activeStrategyPath)} работает: все адреса доступны."
-                : $"Активная стратегия {Path.GetFileNameWithoutExtension(activeStrategyPath)}: доступны {string.Join(", ", passed)}; нет ответа от {string.Join(", ", failed)}.";
+                ? $"Активная стратегия {displayStrategyName} работает: все адреса доступны."
+                : $"Активная стратегия {displayStrategyName}: доступны {string.Join(", ", passed)}; нет ответа от {string.Join(", ", failed)}.";
             ZapretHealthStatusText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
+            ZapretTestPhaseText.Text = healthy ? "Все сайты доступны" : "Есть недоступные сайты";
+            ZapretTestPhaseText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
         }
         catch (Exception error)
         {
             ZapretHealthStatusText.Text = $"Не удалось проверить активную стратегию: {error.Message}";
+            ZapretTestPhaseText.Text = "Ошибка проверки";
+            ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.IndianRed;
         }
         finally
         {
+            ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             CheckActiveStrategyButton.IsEnabled = true;
         }
     }
