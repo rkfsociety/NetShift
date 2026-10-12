@@ -2,6 +2,8 @@ name: Create NetShift release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -13,13 +15,79 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    # Deleting older version tags also creates push events. Ignore those.
+  prepare:
     if: github.event.deleted == false
     runs-on: windows-latest
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      should_release: ${{ steps.version.outputs.should_release }}
+    steps:
+      - name: Check out source and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version and create tag when needed
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $tag = $env:GITHUB_REF_NAME
+            if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+              throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.9."
+            }
+            $version = $Matches.version
+          } else {
+            [xml]$project = Get-Content .\src\NetShift.App\NetShift.App.csproj -Raw
+            $version = [string]$project.Project.PropertyGroup.Version
+            if ($version -notmatch '^\d+\.\d+\.\d+$') {
+              throw "NetShift.App.csproj Version must use MAJOR.MINOR.PATCH format. Found: $version"
+            }
+
+            $currentVersion = [Version]::Parse($version)
+            $latestVersion = [Version]::new(0, 0, 0)
+            $latestTag = $null
+            foreach ($existingTag in (git tag --list 'v*')) {
+              if ($existingTag -match '^v(?<tagVersion>\d+\.\d+\.\d+)$') {
+                $parsedVersion = [Version]::Parse($Matches.tagVersion)
+                if ($parsedVersion -gt $latestVersion) {
+                  $latestVersion = $parsedVersion
+                  $latestTag = $existingTag
+                }
+              }
+            }
+
+            if ($currentVersion -le $latestVersion) {
+              Write-Host "Version $version is not newer than the latest release tag $latestTag. Skipping release."
+              "should_release=false" >> $env:GITHUB_OUTPUT
+              "release_tag=v$version" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
+
+            $tag = "v$version"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a $tag -m "NetShift $tag"
+            if ($LASTEXITCODE -ne 0) { throw "Could not create tag $tag." }
+
+            git push origin $tag
+            if ($LASTEXITCODE -ne 0) { throw "Could not push tag $tag." }
+          }
+
+          "should_release=true" >> $env:GITHUB_OUTPUT
+          "release_tag=$tag" >> $env:GITHUB_OUTPUT
+
+  release:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.release_tag }}
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
@@ -29,7 +97,7 @@ jobs:
       - name: Publish self-contained DNS Windows service payload
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
             throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.1."
           }
@@ -66,7 +134,7 @@ jobs:
       - name: Publish self-installing Windows app
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
             throw "Release tag must use the vMAJOR.MINOR.PATCH format, for example v0.3.1."
           }
@@ -118,7 +186,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $env:RELEASE_EXECUTABLE $env:RELEASE_EXECUTABLE_CHECKSUM $env:RELEASE_ARCHIVE $env:RELEASE_CHECKSUM `
@@ -145,7 +213,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repository = $env:GITHUB_REPOSITORY
-          $currentTag = $env:GITHUB_REF_NAME
+          $currentTag = $env:RELEASE_TAG
           $oldReleaseTags = gh release list `
             --repo $repository `
             --limit 1000 `
