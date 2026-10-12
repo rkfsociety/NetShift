@@ -70,6 +70,10 @@ public partial class MainWindow : Window
         FakeTargetComboBox.SelectedValuePath = nameof(PackageChoice.Value);
         FakeTargetComboBox.SelectedIndex = 0;
         LoadSettings();
+        LegacyModeRadio.IsChecked = !_settings.NativeDnsMode;
+        NativeModeRadio.IsChecked = _settings.NativeDnsMode;
+        SupportIPv6CheckBox.IsChecked = _settings.SupportIPv6;
+        ConfigureVpnAdaptersCheckBox.IsChecked = _settings.ConfigureVpnAdapters;
         AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         RefreshDnsServiceStatus();
@@ -85,7 +89,7 @@ public partial class MainWindow : Window
         var exitItem = new System.Windows.Forms.ToolStripMenuItem("Выход");
         exitItem.Click += (_, _) => Dispatcher.BeginInvoke(() =>
         {
-            AllowCloseAndDisposeTrayIcon();
+            if (!AllowCloseAndDisposeTrayIcon()) return;
             System.Windows.Application.Current.Shutdown();
         });
         menu.Items.Add(openItem);
@@ -95,7 +99,7 @@ public partial class MainWindow : Window
         var icon = new System.Windows.Forms.NotifyIcon
         {
             Text = "NetShift — DNS и zapret",
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? string.Empty) ?? System.Drawing.SystemIcons.Application,
             ContextMenuStrip = menu,
             Visible = true
         };
@@ -127,11 +131,18 @@ public partial class MainWindow : Window
         Activate();
     }
 
-    private void AllowCloseAndDisposeTrayIcon()
+    private bool AllowCloseAndDisposeTrayIcon()
     {
-        StopLegacyDnsAndRestore();
+        if (!StopLegacyDnsAndRestore())
+        {
+            ShowFromTray();
+            MessageBox.Show(this, "Не удалось вернуть DNS адаптера. NetShift останется запущен, чтобы не потерять локальный DNS-прокси.",
+                "Legacy DNS ещё активен", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
         _allowClose = true;
         DisposeTrayIcon();
+        return true;
     }
 
     private void DisposeTrayIcon()
@@ -171,7 +182,7 @@ public partial class MainWindow : Window
     private void RefreshAdapters(bool selectFirst = false)
     {
         var selectedIndex = (AdapterComboBox.SelectedItem as NetworkAdapterInfo)?.InterfaceIndex;
-        _adapters = NetworkService.GetAdapters();
+        _adapters = NetworkService.GetAdapters(_settings.ConfigureVpnAdapters);
         AdapterComboBox.ItemsSource = _adapters;
         var selected = _adapters.FirstOrDefault(adapter => adapter.InterfaceIndex == selectedIndex);
         AdapterComboBox.SelectedItem = selected ?? (selectFirst ? _adapters.FirstOrDefault() : null);
@@ -428,7 +439,14 @@ public partial class MainWindow : Window
         using (var legacyProfile = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\NetShift\LegacyDns"))
         {
             if (Convert.ToInt32(legacyProfile?.GetValue("Enabled", 0) ?? 0) == 1)
-                RunElevatedWorker("dns-legacy-restore");
+            {
+                if (!RunElevatedWorker("dns-legacy-restore"))
+                {
+                    MessageBox.Show(this, "Сначала восстановите предыдущие DNS-настройки Legacy, чтобы не потерять подключение.",
+                        "Нужно восстановить DNS", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
         }
 
         if (NetShiftBootstrapper.HasEmbeddedDnsService() && !IsDnsServiceCurrent())
@@ -681,6 +699,13 @@ public partial class MainWindow : Window
 
     private void RefreshAdapters_Click(object sender, RoutedEventArgs e) => RefreshAdapters();
 
+    private void ConfigureVpnAdapters_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ConfigureVpnAdapters = ConfigureVpnAdaptersCheckBox.IsChecked == true;
+        SaveSettings();
+        RefreshAdapters(selectFirst: true);
+    }
+
     private void ApplyDns_Click(object sender, RoutedEventArgs e)
     {
         if (AdapterComboBox.SelectedItem is not NetworkAdapterInfo adapter)
@@ -690,10 +715,11 @@ public partial class MainWindow : Window
         }
 
         var ipv4Addresses = SplitAddresses(Ipv4TextBox.Text);
-        var ipv6Addresses = SplitAddresses(Ipv6TextBox.Text);
+        var ipv6Addresses = SupportIPv6CheckBox.IsChecked == true ? SplitAddresses(Ipv6TextBox.Text) : [];
         var addresses = ipv4Addresses.Concat(ipv6Addresses).ToArray();
-        var dohTemplate = DohEnabledCheckBox.IsChecked == true ? DohTemplateTextBox.Text.Trim() : string.Empty;
         var legacyMode = LegacyModeRadio.IsChecked == true;
+        var dohTemplate = DohTemplateTextBox.Text.Trim();
+        if (!legacyMode && DohEnabledCheckBox.IsChecked != true) dohTemplate = string.Empty;
         if (addresses.Length == 0 || !HasFamily(ipv4Addresses, AddressFamily.InterNetwork) ||
             !HasFamily(ipv6Addresses, AddressFamily.InterNetworkV6))
         {
@@ -724,15 +750,24 @@ public partial class MainWindow : Window
             {
                 if (_legacyDohProxy is null || _legacyAdapterIndex != adapter.InterfaceIndex || !string.Equals(_legacyDohEndpoint, dohTemplate, StringComparison.OrdinalIgnoreCase))
                 {
-                    StopLegacyDnsAndRestore();
+                    if (!StopLegacyDnsAndRestore()) return;
                     _legacyDohProxy = new LegacyDohProxy(dohTemplate);
                     _legacyDohEndpoint = dohTemplate;
                 }
                 if (RunElevatedWorker("dns-legacy-apply", adapter.InterfaceIndex.ToString()))
                 {
                     _legacyAdapterIndex = adapter.InterfaceIndex;
+                    _settings.NativeDnsMode = false;
+                    _settings.SupportIPv6 = SupportIPv6CheckBox.IsChecked == true;
+                    SaveSettings();
                     MessageBox.Show(this, "Legacy DNS включён. Локальный прокси работает, пока NetShift запущен; при выходе DNS адаптера будет восстановлен.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
                     RefreshAdapters();
+                }
+                else if (_legacyAdapterIndex is null && _legacyDohProxy is not null)
+                {
+                    _legacyDohProxy.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    _legacyDohProxy = null;
+                    _legacyDohEndpoint = null;
                 }
             }
             catch (Exception error)
@@ -747,19 +782,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        StopLegacyDnsAndRestore();
+        if (!StopLegacyDnsAndRestore()) return;
         if (RunElevatedWorker("dns-apply", adapter.InterfaceIndex.ToString(), string.Join(',', addresses), dohTemplate))
         {
+            _settings.NativeDnsMode = true;
+            _settings.SupportIPv6 = SupportIPv6CheckBox.IsChecked == true;
+            SaveSettings();
             MessageBox.Show(this, "Native DNS применён и сохранён в Windows. DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
         }
     }
 
-    private void StopLegacyDnsAndRestore()
+    private bool StopLegacyDnsAndRestore()
     {
         if (_legacyAdapterIndex is not null)
         {
-            RunElevatedWorker("dns-legacy-restore");
+            if (!RunElevatedWorker("dns-legacy-restore")) return false;
             _legacyAdapterIndex = null;
         }
         if (_legacyDohProxy is not null)
@@ -768,6 +806,7 @@ public partial class MainWindow : Window
             _legacyDohProxy = null;
             _legacyDohEndpoint = null;
         }
+        return true;
     }
 
     private void ResetDns_Click(object sender, RoutedEventArgs e)
@@ -783,9 +822,11 @@ public partial class MainWindow : Window
             "Вернуть DHCP", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirmation != MessageBoxResult.OK) return;
 
-        StopLegacyDnsAndRestore();
+        if (!StopLegacyDnsAndRestore()) return;
         if (RunElevatedWorker("dns-reset", adapter.InterfaceIndex.ToString()))
         {
+            _settings.NativeDnsMode = false;
+            SaveSettings();
             MessageBox.Show(this, "Для интерфейса включено получение DNS по DHCP.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
         }
@@ -1402,6 +1443,9 @@ public partial class MainWindow : Window
         public bool CheckZapretUpdatesBeforeStart { get; set; }
         public bool InitialZapretCheckCompleted { get; set; }
         public Dictionary<string, bool> ZapretStrategyHealth { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool NativeDnsMode { get; set; } = true;
+        public bool SupportIPv6 { get; set; } = true;
+        public bool ConfigureVpnAdapters { get; set; }
     }
 
     private sealed record PackageChoice(string Name, string Value);

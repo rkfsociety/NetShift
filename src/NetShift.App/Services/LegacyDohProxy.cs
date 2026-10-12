@@ -18,7 +18,7 @@ internal sealed class LegacyDohProxy : IAsyncDisposable
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             throw new ArgumentException("Для Legacy нужен HTTPS-адрес DoH.", nameof(endpoint));
         _endpoint = uri;
-        var bootstrap = Dns.GetHostAddresses(uri.DnsSafeHost).Where(address => address.AddressFamily == AddressFamily.InterNetwork).ToArray();
+        var bootstrap = Dns.GetHostAddresses(uri.DnsSafeHost);
         if (bootstrap.Length == 0) throw new InvalidOperationException("Не удалось разрешить адрес DoH до включения Legacy.");
         var handler = new SocketsHttpHandler
         {

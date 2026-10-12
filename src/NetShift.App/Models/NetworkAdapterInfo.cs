@@ -7,6 +7,7 @@ public sealed class NetworkAdapterInfo
     public required string Status { get; init; }
     public required int InterfaceIndex { get; init; }
     public required string DnsSummary { get; init; }
+    public bool IsVpn { get; init; }
 
     public override string ToString() => $"{Name}  ·  {Status}";
 }

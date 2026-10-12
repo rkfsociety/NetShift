@@ -113,6 +113,8 @@
                 </Grid>
                 <TextBlock Text="Введите адреса через запятую. Применение заменит список DNS на выбранном интерфейсе."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,10,0,0" />
+                <CheckBox x:Name="SupportIPv6CheckBox" Content="Поддержка IPv6" IsChecked="True" Margin="1,10,0,0" />
+                <CheckBox x:Name="ConfigureVpnAdaptersCheckBox" Content="Показывать VPN-адаптеры в списке" IsChecked="False" Click="ConfigureVpnAdapters_Click" Margin="1,6,0,0" />
                 <TextBlock Text="Способ защиты DNS-запросов" FontSize="13" FontWeight="SemiBold" Margin="1,15,0,8" />
                 <StackPanel>
                   <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" IsChecked="True" Content="Legacy DNS перехват" Margin="1,2" />
