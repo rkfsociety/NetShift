@@ -1228,5 +1228,8 @@ public partial class MainWindow : Window
     }
 
     private sealed record PackageChoice(string Name, string Value);
-    private sealed record StrategyItem(string Name, string Path);
+    private sealed record StrategyItem(string Name, string Path)
+    {
+        public override string ToString() => Name;
+    }
 }
