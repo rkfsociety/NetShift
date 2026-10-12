@@ -473,11 +473,13 @@ public partial class MainWindow : Window
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         if (output is null)
         {
+            InstallDnsServiceButton.Visibility = Visibility.Visible;
             DnsServiceStatusText.Text = "Служба DNS: не установлена · системный DNS остаётся настроенным в Windows";
             RemoveDnsServiceButton.IsEnabled = false;
             return;
         }
 
+        InstallDnsServiceButton.Visibility = Visibility.Collapsed;
         var state = output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ? "работает"
             : output.Contains("STOP_PENDING", StringComparison.OrdinalIgnoreCase) ? "останавливается"
             : output.Contains("START_PENDING", StringComparison.OrdinalIgnoreCase) ? "запускается"

@@ -74,7 +74,8 @@
                 <TextBlock x:Name="DnsServiceStatusText" Text="Служба DNS: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,0,0,10" />
                 <WrapPanel>
                   <Button x:Name="InstallDnsServiceButton" Content="Установить / обновить службу DNS" Click="InstallDnsService_Click"
-                          Background="{StaticResource AccentBrush}" Foreground="#07151A" BorderBrush="{StaticResource AccentBrush}" />
+                          Visibility="Collapsed" Background="{StaticResource AccentBrush}" Foreground="#07151A"
+                          BorderBrush="{StaticResource AccentBrush}" />
                   <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click" Margin="8,0,0,0" />
                   <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Margin="8,0,0,0" />
                 </WrapPanel>
