@@ -229,7 +229,6 @@ public partial class MainWindow : Window
             var hasHealth = _settings.ZapretStrategyHealth.TryGetValue(HealthKey(fullPath), out var isHealthy);
             return new StrategyItem(Path.GetFileName(path), fullPath, hasHealth ? isHealthy : null);
         }).ToArray();
-        StrategyComboBox.DisplayMemberPath = nameof(StrategyItem.Name);
         StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
         StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
 
