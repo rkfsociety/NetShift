@@ -3,11 +3,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NetShift.App</RootNamespace>
     <AssemblyName>NetShift</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
   <ItemGroup Condition="'$(NetShiftUpdateRepository)' != ''">
     <AssemblyMetadata Include="NetShiftUpdateRepository" Value="$(NetShiftUpdateRepository)" />

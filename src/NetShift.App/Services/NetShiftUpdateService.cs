@@ -30,7 +30,7 @@ public static class NetShiftUpdateService
         get
         {
             var value = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            return string.IsNullOrWhiteSpace(value) ? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.1.0" : value;
+            return string.IsNullOrWhiteSpace(value) ? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.2.0" : value;
         }
     }
 

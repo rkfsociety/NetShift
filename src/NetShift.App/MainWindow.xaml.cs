@@ -23,10 +23,18 @@ public partial class MainWindow : Window
     private IReadOnlyList<NetworkAdapterInfo> _adapters = [];
     private AppSettings _settings = new();
     private NetShiftUpdate? _availableUpdate;
+    private readonly System.Windows.Forms.NotifyIcon _trayIcon;
+    private bool _allowClose;
+    private bool _trayNoticeShown;
+    private bool _trayIconDisposed;
 
     public MainWindow()
     {
         InitializeComponent();
+        _trayIcon = CreateTrayIcon();
+        Closing += MainWindow_Closing;
+        Closed += (_, _) => DisposeTrayIcon();
+        System.Windows.Application.Current.SessionEnding += (_, _) => AllowCloseAndDisposeTrayIcon();
         ProviderComboBox.ItemsSource = _dnsProviders;
         ProviderComboBox.SelectedIndex = 0;
         Loaded += MainWindow_Loaded;
@@ -58,6 +66,70 @@ public partial class MainWindow : Window
         LoadSettings();
         RefreshAdapters(selectFirst: true);
         RefreshZapretFolder();
+    }
+
+    private System.Windows.Forms.NotifyIcon CreateTrayIcon()
+    {
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        var openItem = new System.Windows.Forms.ToolStripMenuItem("Открыть NetShift");
+        openItem.Click += (_, _) => Dispatcher.BeginInvoke(ShowFromTray);
+        var exitItem = new System.Windows.Forms.ToolStripMenuItem("Выход");
+        exitItem.Click += (_, _) => Dispatcher.BeginInvoke(() =>
+        {
+            AllowCloseAndDisposeTrayIcon();
+            System.Windows.Application.Current.Shutdown();
+        });
+        menu.Items.Add(openItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        menu.Items.Add(exitItem);
+
+        var icon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "NetShift — DNS и zapret",
+            Icon = System.Drawing.SystemIcons.Application,
+            ContextMenuStrip = menu,
+            Visible = true
+        };
+        icon.MouseClick += (_, eventArgs) =>
+        {
+            if (eventArgs.Button == System.Windows.Forms.MouseButtons.Left)
+                Dispatcher.BeginInvoke(ShowFromTray);
+        };
+        return icon;
+    }
+
+    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_allowClose) return;
+
+        e.Cancel = true;
+        Hide();
+        if (_trayNoticeShown) return;
+        _trayNoticeShown = true;
+        _trayIcon.ShowBalloonTip(3500, "NetShift продолжает работать", "Окно скрыто в системный трей. Откройте значок NetShift, чтобы вернуться.",
+            System.Windows.Forms.ToolTipIcon.Info);
+    }
+
+    private void ShowFromTray()
+    {
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Show();
+        Activate();
+    }
+
+    private void AllowCloseAndDisposeTrayIcon()
+    {
+        _allowClose = true;
+        DisposeTrayIcon();
+    }
+
+    private void DisposeTrayIcon()
+    {
+        if (_trayIconDisposed) return;
+        _trayIconDisposed = true;
+        _trayIcon.Visible = false;
+        _trayIcon.Dispose();
     }
 
     private void LoadSettings()
@@ -404,6 +476,7 @@ public partial class MainWindow : Window
             var targetExecutable = Path.Combine(AppContext.BaseDirectory, "NetShift.exe");
             NetShiftUpdateService.LaunchUpdater(stagedExecutable, targetExecutable, Environment.ProcessId);
             UpdateStatusText.Text = "Обновление подготовлено; NetShift перезапустится автоматически…";
+            AllowCloseAndDisposeTrayIcon();
             Application.Current.Shutdown();
         }
         catch (Exception error)

@@ -36,7 +36,7 @@
 
     <StackPanel Grid.Row="1" Margin="0,0,0,18">
       <TextBlock Text="Сеть, которую легко переключить" FontSize="28" FontWeight="SemiBold" />
-      <TextBlock Text="Выберите DNS для адаптера или управляйте локальным пакетом zapret. Для системных действий Windows запросит подтверждение администратора."
+      <TextBlock Text="Выберите DNS или управляйте zapret. Закрытие окна скрывает NetShift в трей; DNS и запущенный zapret продолжают работать. Windows запросит подтверждение для системных действий."
                  Foreground="{StaticResource MutedBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,7,0,0" />
     </StackPanel>
 
@@ -59,6 +59,8 @@
                 </Grid>
                 <ComboBox x:Name="AdapterComboBox" SelectionChanged="AdapterComboBox_SelectionChanged" />
                 <TextBlock x:Name="CurrentDnsText" Text="Текущие DNS: загрузка…" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,10,0,0" />
+                <TextBlock Text="DNS настраивается в Windows и продолжает работать после закрытия NetShift и во время его обновления."
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,8,0,0" />
               </StackPanel>
             </Border>
 
