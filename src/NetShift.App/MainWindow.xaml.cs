@@ -42,7 +42,6 @@ public partial class MainWindow : Window
         Closed += (_, _) => DisposeTrayIcon();
         System.Windows.Application.Current.SessionEnding += (_, _) => AllowCloseAndDisposeTrayIcon();
         ProviderComboBox.ItemsSource = _dnsProviders;
-        ProviderComboBox.SelectedIndex = 0;
         Loaded += MainWindow_Loaded;
         GameFilterModeComboBox.ItemsSource = new[]
         {
@@ -70,6 +69,8 @@ public partial class MainWindow : Window
         FakeTargetComboBox.SelectedValuePath = nameof(PackageChoice.Value);
         FakeTargetComboBox.SelectedIndex = 0;
         LoadSettings();
+        ProviderComboBox.SelectedItem = _dnsProviders.FirstOrDefault(provider =>
+            provider.Name.Equals(_settings.DnsProviderName ?? "DNS-AI", StringComparison.OrdinalIgnoreCase)) ?? _dnsProviders[0];
         LegacyModeRadio.IsChecked = !_settings.NativeDnsMode;
         NativeModeRadio.IsChecked = _settings.NativeDnsMode;
         SupportIPv6CheckBox.IsChecked = _settings.SupportIPv6;
@@ -428,6 +429,8 @@ public partial class MainWindow : Window
     private void ProviderComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (Ipv4TextBox is null || ProviderComboBox.SelectedItem is not DnsProvider provider) return;
+        _settings.DnsProviderName = provider.Name;
+        SaveSettings();
         Ipv4TextBox.Text = provider.Ipv4;
         Ipv6TextBox.Text = provider.Ipv6;
         DohTemplateTextBox.Text = provider.DohTemplate ?? string.Empty;
@@ -1446,6 +1449,7 @@ public partial class MainWindow : Window
         public bool NativeDnsMode { get; set; } = true;
         public bool SupportIPv6 { get; set; } = true;
         public bool ConfigureVpnAdapters { get; set; }
+        public string? DnsProviderName { get; set; }
     }
 
     private sealed record PackageChoice(string Name, string Value);
