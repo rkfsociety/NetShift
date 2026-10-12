@@ -49,14 +49,36 @@ public static class AdminCommandRouter
                                 .Append(PsLiteral(dohTemplate)).Append(" -AutoUpgrade $true -AllowFallbackToUdp $false }; ");
                         }
                     }
-                    dnsApplyScript.Append($"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ServerAddresses @({string.Join(",", addresses.Select(PsLiteral))})");
+                    dnsApplyScript.Append($"$adapter = Get-NetAdapter -InterfaceIndex {interfaceIndex} -ErrorAction Stop; ")
+                        .Append($"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ServerAddresses @({string.Join(",", addresses.Select(PsLiteral))}); ")
+                        .Append("$key = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\Dns'); ")
+                        .Append("$revision = [long]$key.GetValue('Revision', 0); ")
+                        .Append("$key.SetValue('Enabled', 1, [Microsoft.Win32.RegistryValueKind]::DWord); ")
+                        .Append("$key.SetValue('InterfaceGuid', $adapter.InterfaceGuid.ToString('D'), [Microsoft.Win32.RegistryValueKind]::String); ")
+                        .Append("$key.SetValue('Addresses', [string[]]@(").Append(string.Join(",", addresses.Select(PsLiteral))).Append("), [Microsoft.Win32.RegistryValueKind]::MultiString); ")
+                        .Append("$key.SetValue('DohTemplate', ").Append(PsLiteral(dohTemplate)).Append(", [Microsoft.Win32.RegistryValueKind]::String); ")
+                        .Append("$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord); $key.Dispose()");
                     RunPowerShell(dnsApplyScript.ToString());
                     break;
 
                 case "dns-reset":
                     if (args.Length < 3 || !int.TryParse(args[2], out interfaceIndex) || interfaceIndex <= 0)
                         throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
-                    RunPowerShell($"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ResetServerAddresses");
+                    RunPowerShell($"$adapter = Get-NetAdapter -InterfaceIndex {interfaceIndex} -ErrorAction Stop; " +
+                        $"Set-DnsClientServerAddress -InterfaceIndex {interfaceIndex} -ResetServerAddresses; " +
+                        "$key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns', $true); " +
+                        "if ($null -ne $key -and [string]::Equals([string]$key.GetValue('InterfaceGuid'), $adapter.InterfaceGuid.ToString('D'), [StringComparison]::OrdinalIgnoreCase)) { " +
+                        "$revision = [long]$key.GetValue('Revision', 0); $key.SetValue('Enabled', 0, [Microsoft.Win32.RegistryValueKind]::DWord); " +
+                        "$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) }; if ($null -ne $key) { $key.Dispose() }");
+                    break;
+
+                case "dns-service-install":
+                    if (args.Length < 4) throw new InvalidOperationException("Не переданы ZIP службы DNS и контрольная сумма.");
+                    InstallDnsService(args[2], args[3]);
+                    break;
+
+                case "dns-service-remove":
+                    RemoveDnsService();
                     break;
 
                 case "zapret-start":
@@ -546,6 +568,148 @@ public static class AdminCommandRouter
         var safetyCopy = hostsPath + $".BeforeRestore-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Guid.NewGuid():N}.bak";
         File.Copy(hostsPath, safetyCopy, overwrite: false);
         File.Copy(fullBackup, hostsPath, overwrite: true);
+    }
+
+    private static void InstallDnsService(string archivePath, string expectedHash)
+    {
+        var fullArchive = VerifyDownloadedFile(archivePath, expectedHash, ".zip");
+        var serviceDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NetShift", "DnsService");
+        var target = Path.Combine(serviceDirectory, "NetShift.DnsService.exe");
+        var staging = target + ".new-" + Guid.NewGuid().ToString("N");
+        var backup = target + ".backup";
+        Directory.CreateDirectory(serviceDirectory);
+
+        try
+        {
+            using var archive = ZipFile.OpenRead(fullArchive);
+            if (archive.Entries.Count != 1 ||
+                !archive.Entries[0].FullName.Equals("NetShift.DnsService.exe", StringComparison.OrdinalIgnoreCase) ||
+                archive.Entries[0].Length <= 0 || archive.Entries[0].Length > 200L * 1024 * 1024)
+                throw new InvalidDataException("ZIP службы должен содержать только NetShift.DnsService.exe.");
+            archive.Entries[0].ExtractToFile(staging, overwrite: false);
+        }
+        catch
+        {
+            try { if (File.Exists(staging)) File.Delete(staging); } catch { }
+            throw;
+        }
+
+        var serviceQuery = RunSc(["query", "NetShiftDns"], allowFailure: true);
+        var wasInstalled = serviceQuery.ExitCode == 0;
+        var wasRunning = wasInstalled && serviceQuery.Output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase);
+        var serviceCreated = false;
+        var hadBackup = File.Exists(target);
+        try
+        {
+            if (wasInstalled)
+            {
+                var imagePath = GetServiceImagePath("NetShiftDns");
+                if (!ImagePathEqualsExecutable(imagePath, target))
+                    throw new InvalidOperationException("Имя службы NetShiftDns уже занято другой программой. NetShift не будет её заменять.");
+                if (!File.Exists(target))
+                    throw new FileNotFoundException("Не найден исполняемый файл установленной службы DNS.", target);
+                RunSc(["config", "NetShiftDns", "start=", "auto", "obj=", "LocalSystem"]);
+                StopServiceAndWait("NetShiftDns");
+            }
+
+            if (hadBackup) File.Copy(target, backup, overwrite: true);
+            File.Move(staging, target, overwrite: true);
+            if (!wasInstalled)
+            {
+                RunSc(["create", "NetShiftDns", "binPath=", $"\"{target}\"", "start=", "auto", "obj=", "LocalSystem", "DisplayName=", "NetShift DNS Service"]);
+                serviceCreated = true;
+            }
+            RunSc(["config", "NetShiftDns", "binPath=", $"\"{target}\"", "start=", "auto", "obj=", "LocalSystem"]);
+            RunSc(["description", "NetShiftDns", "Восстанавливает сохранённые настройки DNS при запуске Windows."]);
+            RunSc(["failure", "NetShiftDns", "reset=", "86400", "actions=", "restart/5000/restart/15000/restart/30000"], allowFailure: true);
+            RunSc(["start", "NetShiftDns"]);
+            WaitForServiceState("NetShiftDns", "RUNNING");
+            if (File.Exists(backup)) File.Delete(backup);
+        }
+        catch
+        {
+            if (hadBackup && File.Exists(backup))
+            {
+                try
+                {
+                    if (QueryServiceState("NetShiftDns") == "RUNNING") StopServiceAndWait("NetShiftDns");
+                    File.Move(backup, target, overwrite: true);
+                    if (wasInstalled && wasRunning) RunSc(["start", "NetShiftDns"], allowFailure: true);
+                }
+                catch { }
+            }
+            else if (serviceCreated)
+            {
+                try { StopAndDeleteService("NetShiftDns"); } catch { }
+                try { if (File.Exists(target)) File.Delete(target); } catch { }
+            }
+            throw;
+        }
+        finally
+        {
+            try { if (File.Exists(staging)) File.Delete(staging); } catch { }
+        }
+    }
+
+    private static void RemoveDnsService()
+    {
+        var serviceQuery = RunSc(["query", "NetShiftDns"], allowFailure: true);
+        if (serviceQuery.ExitCode == 0)
+        {
+            var target = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NetShift", "DnsService", "NetShift.DnsService.exe");
+            if (!ImagePathEqualsExecutable(GetServiceImagePath("NetShiftDns"), target))
+                throw new InvalidOperationException("Служба NetShiftDns указывает на другой исполняемый файл; удаление отменено.");
+            StopAndDeleteService("NetShiftDns");
+        }
+
+        var serviceDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NetShift", "DnsService");
+        var executable = Path.Combine(serviceDirectory, "NetShift.DnsService.exe");
+        if (File.Exists(executable)) File.Delete(executable);
+        if (Directory.Exists(serviceDirectory) && !Directory.EnumerateFileSystemEntries(serviceDirectory).Any())
+            Directory.Delete(serviceDirectory);
+        // DNS stays configured in Windows after removing the service.
+    }
+
+    private static string? GetServiceImagePath(string serviceName)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}");
+        return key?.GetValue("ImagePath") as string;
+    }
+
+    private static bool ImagePathEqualsExecutable(string? imagePath, string executable)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath)) return false;
+        var trimmed = imagePath.Trim();
+        var configuredPath = trimmed.StartsWith('"')
+            ? trimmed[1..].Split('"', 2)[0]
+            : trimmed.Split(' ', 2)[0];
+        try { return Path.GetFullPath(configuredPath).Equals(Path.GetFullPath(executable), StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    private static string? QueryServiceState(string serviceName)
+    {
+        var query = RunSc(["query", serviceName], allowFailure: true);
+        if (query.ExitCode != 0) return null;
+        if (query.Output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)) return "RUNNING";
+        if (query.Output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase)) return "STOPPED";
+        return null;
+    }
+
+    private static void StopServiceAndWait(string serviceName)
+    {
+        if (QueryServiceState(serviceName) == "RUNNING") RunSc(["stop", serviceName], allowFailure: true);
+        WaitForServiceState(serviceName, "STOPPED");
+    }
+
+    private static void WaitForServiceState(string serviceName, string expectedState)
+    {
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            if (QueryServiceState(serviceName) == expectedState) return;
+            Thread.Sleep(250);
+        }
+        throw new TimeoutException($"Служба {serviceName} не перешла в состояние {expectedState}.");
     }
 
     private static void InstallPackage(string archivePath, string tag, string expectedHash)

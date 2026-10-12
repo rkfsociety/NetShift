@@ -64,6 +64,9 @@ public partial class MainWindow : Window
         FakeTargetComboBox.SelectedValuePath = nameof(PackageChoice.Value);
         FakeTargetComboBox.SelectedIndex = 0;
         LoadSettings();
+        AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
+        InstallDnsServiceButton.IsEnabled = NetShiftUpdateService.Repository is not null;
+        RefreshDnsServiceStatus();
         RefreshAdapters(selectFirst: true);
         RefreshZapretFolder();
     }
@@ -414,6 +417,116 @@ public partial class MainWindow : Window
             CheckNetShiftUpdatesAsync(showError: false));
     }
 
+    private void AppAutoStart_Click(object sender, RoutedEventArgs e)
+    {
+        var enabled = AppAutoStartCheckBox.IsChecked == true;
+        try
+        {
+            using var runKey = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true)
+                ?? throw new InvalidOperationException("Не удалось открыть настройки автозапуска Windows.");
+            if (enabled)
+            {
+                var executable = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
+                    throw new InvalidOperationException("Не удалось определить путь к NetShift.exe.");
+                runKey.SetValue("NetShift", $"\"{executable}\"", RegistryValueKind.String);
+            }
+            else
+            {
+                runKey.DeleteValue("NetShift", throwOnMissingValue: false);
+            }
+        }
+        catch (Exception error)
+        {
+            AppAutoStartCheckBox.IsChecked = !enabled;
+            MessageBox.Show(this, error.Message, "Автозапуск NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static bool IsAppAutoStartEnabled()
+    {
+        try
+        {
+            using var runKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            var currentExecutable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(currentExecutable) || runKey?.GetValue("NetShift") is not string command) return false;
+            var configuredExecutable = command.Trim().Trim('"');
+            return Path.GetFullPath(configuredExecutable).Equals(Path.GetFullPath(currentExecutable), StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    private void RefreshDnsServiceStatus()
+    {
+        if (DnsServiceStatusText is null) return;
+        var output = QueryWindowsService("NetShiftDns");
+        InstallDnsServiceButton.IsEnabled = NetShiftUpdateService.Repository is not null;
+        if (output is null)
+        {
+            DnsServiceStatusText.Text = "Служба DNS: не установлена · системный DNS остаётся настроенным в Windows";
+            RemoveDnsServiceButton.IsEnabled = false;
+            return;
+        }
+
+        var state = output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ? "работает"
+            : output.Contains("STOP_PENDING", StringComparison.OrdinalIgnoreCase) ? "останавливается"
+            : output.Contains("START_PENDING", StringComparison.OrdinalIgnoreCase) ? "запускается"
+            : output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase) ? "остановлена"
+            : "установлена";
+        var startMode = "автозапуск не проверен";
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\NetShiftDns");
+            startMode = Convert.ToInt32(key?.GetValue("Start") ?? 3) == 2 ? "автозапуск Windows включён" : "автозапуск Windows выключен";
+        }
+        catch { }
+        DnsServiceStatusText.Text = $"Служба DNS: {state} · {startMode} · работает независимо от NetShift";
+        RemoveDnsServiceButton.IsEnabled = true;
+    }
+
+    private async void InstallDnsService_Click(object sender, RoutedEventArgs e)
+    {
+        if (NetShiftUpdateService.Repository is null)
+        {
+            MessageBox.Show(this, "Установка службы доступна в релизной сборке NetShift.", "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        InstallDnsServiceButton.IsEnabled = false;
+        try
+        {
+            DnsServiceStatusText.Text = "Проверяю DNS-службу в последнем релизе NetShift…";
+            var package = await NetShiftUpdateService.GetLatestDnsServicePackageAsync(CancellationToken.None);
+            var progress = new Progress<double>(value => DnsServiceStatusText.Text = $"Скачиваю DNS-службу {package.Tag}: {value:P0}");
+            var downloaded = await NetShiftUpdateService.DownloadDnsServicePackageAsync(package, progress, CancellationToken.None);
+            DnsServiceStatusText.Text = "Архив проверен по SHA-256. Windows запросит права администратора для установки автозапускающейся службы.";
+            if (RunElevatedWorker("dns-service-install", downloaded.ArchivePath, downloaded.Sha256))
+                DnsServiceStatusText.Text = "DNS-служба установлена и настроена на автоматический запуск вместе с Windows.";
+        }
+        catch (Exception error)
+        {
+            DnsServiceStatusText.Text = "Установка DNS-службы не завершена.";
+            MessageBox.Show(this, error.Message, "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            RefreshDnsServiceStatus();
+        }
+    }
+
+    private void RemoveDnsService_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this,
+                "Удалить службу NetShift DNS? Системные DNS-адреса останутся настроенными в Windows, но служба больше не будет восстанавливать профиль при запуске компьютера.",
+                "Удалить DNS-службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+        if (RunElevatedWorker("dns-service-remove"))
+            DnsServiceStatusText.Text = "DNS-служба удалена. DNS Windows оставлен без изменений.";
+        RefreshDnsServiceStatus();
+    }
+
+    private void RefreshDnsServiceStatus_Click(object sender, RoutedEventArgs e) => RefreshDnsServiceStatus();
+
     private async Task CheckNetShiftUpdatesAsync(bool showError)
     {
         if (NetShiftUpdateService.Repository is null)
@@ -556,7 +669,7 @@ public partial class MainWindow : Window
 
         if (RunElevatedWorker("dns-apply", adapter.InterfaceIndex.ToString(), string.Join(',', addresses), dohTemplate))
         {
-            MessageBox.Show(this, "DNS-адреса применены.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "DNS-адреса применены и сохранены в Windows. Установленная DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
         }
     }

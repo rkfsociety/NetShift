@@ -26,7 +26,9 @@
         <TextBlock Text="NetShift" FontSize="22" FontWeight="Bold" />
         <TextBlock Text="Сеть под контролем" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0" />
       </StackPanel>
-      <StackPanel Grid.Column="2" Width="230" VerticalAlignment="Center" HorizontalAlignment="Right">
+      <StackPanel Grid.Column="2" Width="285" VerticalAlignment="Center" HorizontalAlignment="Right">
+        <CheckBox x:Name="AppAutoStartCheckBox" Content="Запускать NetShift вместе с Windows" Click="AppAutoStart_Click"
+                  HorizontalAlignment="Right" Margin="0,0,0,6" FontSize="11" />
         <TextBlock x:Name="UpdateStatusText" Text="Обновления проверяются при запуске" Foreground="{StaticResource MutedBrush}"
                    FontSize="10" TextAlignment="Right" TextWrapping="Wrap" />
         <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
@@ -61,6 +63,21 @@
                 <TextBlock x:Name="CurrentDnsText" Text="Текущие DNS: загрузка…" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,10,0,0" />
                 <TextBlock Text="DNS настраивается в Windows и продолжает работать после закрытия NetShift и во время его обновления."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,8,0,0" />
+              </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Text="Служба DNS Windows" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="Работает отдельно от окна NetShift, запускается вместе с Windows и восстанавливает сохранённый DNS-профиль. Закрытие приложения и его обновление не останавливают службу и не сбрасывают DNS."
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,10" />
+                <TextBlock x:Name="DnsServiceStatusText" Text="Служба DNS: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,0,0,10" />
+                <WrapPanel>
+                  <Button x:Name="InstallDnsServiceButton" Content="Установить / обновить службу DNS" Click="InstallDnsService_Click"
+                          Background="{StaticResource AccentBrush}" Foreground="#07151A" BorderBrush="{StaticResource AccentBrush}" />
+                  <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click" Margin="8,0,0,0" />
+                  <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Margin="8,0,0,0" />
+                </WrapPanel>
               </StackPanel>
             </Border>
 
