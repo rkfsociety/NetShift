@@ -113,8 +113,17 @@
                 </Grid>
                 <TextBlock Text="Введите адреса через запятую. Применение заменит список DNS на выбранном интерфейсе."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="1,10,0,0" />
-                <CheckBox x:Name="DohEnabledCheckBox" Content="Включить DoH в Windows без возврата к открытому DNS"
-                          IsChecked="False" Margin="1,14,0,7" />
+                <TextBlock Text="Способ защиты DNS-запросов" FontSize="13" FontWeight="SemiBold" Margin="1,15,0,8" />
+                <StackPanel>
+                  <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" IsChecked="True" Content="Legacy DNS перехват" Margin="1,2" />
+                  <TextBlock Text="Запросы идут через локальный прокси NetShift и шифруются через DoH. Работает, пока NetShift запущен."
+                             Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="20,0,0,8" />
+                  <RadioButton x:Name="NativeModeRadio" GroupName="DnsMode" Content="Native DNS support · рекомендуется" Margin="1,2" />
+                  <TextBlock Text="Windows DNS Client использует DoH самостоятельно. Служба NetShift сохраняет настройки между перезапусками и работает независимо от окна."
+                             Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="20,0,0,8" />
+                </StackPanel>
+                <CheckBox x:Name="DohEnabledCheckBox" Content="Использовать DoH в Windows (для режима Native)"
+                          IsChecked="False" Margin="1,8,0,7" />
                 <TextBox x:Name="DohTemplateTextBox" IsEnabled="{Binding IsChecked, ElementName=DohEnabledCheckBox}"
                          ToolTip="Например: https://dns.dns-ai.ru/dns-query" />
                 <TextBlock x:Name="DnsProviderStatusText" Text="DNS-AI: загружаются актуальные настройки сайта…"

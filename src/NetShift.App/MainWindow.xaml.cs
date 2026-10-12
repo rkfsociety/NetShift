@@ -27,6 +27,9 @@ public partial class MainWindow : Window
     private AppSettings _settings = new();
     private NetShiftUpdate? _availableUpdate;
     private readonly System.Windows.Forms.NotifyIcon _trayIcon;
+    private LegacyDohProxy? _legacyDohProxy;
+    private int? _legacyAdapterIndex;
+    private string? _legacyDohEndpoint;
     private bool _allowClose;
     private bool _trayNoticeShown;
     private bool _trayIconDisposed;
@@ -126,6 +129,7 @@ public partial class MainWindow : Window
 
     private void AllowCloseAndDisposeTrayIcon()
     {
+        StopLegacyDnsAndRestore();
         _allowClose = true;
         DisposeTrayIcon();
     }
@@ -421,6 +425,12 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        using (var legacyProfile = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\NetShift\LegacyDns"))
+        {
+            if (Convert.ToInt32(legacyProfile?.GetValue("Enabled", 0) ?? 0) == 1)
+                RunElevatedWorker("dns-legacy-restore");
+        }
+
         if (NetShiftBootstrapper.HasEmbeddedDnsService() && !IsDnsServiceCurrent())
         {
             DnsServiceStatusText.Text = QueryWindowsService("NetShiftDns") is null
@@ -683,6 +693,7 @@ public partial class MainWindow : Window
         var ipv6Addresses = SplitAddresses(Ipv6TextBox.Text);
         var addresses = ipv4Addresses.Concat(ipv6Addresses).ToArray();
         var dohTemplate = DohEnabledCheckBox.IsChecked == true ? DohTemplateTextBox.Text.Trim() : string.Empty;
+        var legacyMode = LegacyModeRadio.IsChecked == true;
         if (addresses.Length == 0 || !HasFamily(ipv4Addresses, AddressFamily.InterNetwork) ||
             !HasFamily(ipv6Addresses, AddressFamily.InterNetworkV6))
         {
@@ -691,7 +702,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DohEnabledCheckBox.IsChecked == true &&
+        if ((legacyMode || DohEnabledCheckBox.IsChecked == true) &&
             (!Uri.TryCreate(dohTemplate, UriKind.Absolute, out var dohUri) || dohUri.Scheme != Uri.UriSchemeHttps ||
              !string.IsNullOrEmpty(dohUri.UserInfo) || !string.IsNullOrEmpty(dohUri.Fragment)))
         {
@@ -701,15 +712,61 @@ public partial class MainWindow : Window
 
         var confirmation = MessageBox.Show(this,
             $"Заменить DNS на выбранном интерфейсе «{adapter.Name}»?\n\n{string.Join("\n", addresses)}" +
-            (dohTemplate.Length == 0 ? string.Empty : $"\n\nDoH: {dohTemplate}\nОткат на незашифрованный DNS выключен.") +
+            (legacyMode ? $"\n\nРежим Legacy: локальный прокси и DoH {dohTemplate}. При выходе NetShift прежние DNS-настройки будут восстановлены." :
+                dohTemplate.Length == 0 ? "" : $"\n\nDoH через Windows DNS Client: {dohTemplate}\nОткат на незашифрованный DNS выключен.") +
             "\n\nWindows запросит подтверждение администратора.",
             "Применить DNS", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirmation != MessageBoxResult.OK) return;
 
+        if (legacyMode)
+        {
+            try
+            {
+                if (_legacyDohProxy is null || _legacyAdapterIndex != adapter.InterfaceIndex || !string.Equals(_legacyDohEndpoint, dohTemplate, StringComparison.OrdinalIgnoreCase))
+                {
+                    StopLegacyDnsAndRestore();
+                    _legacyDohProxy = new LegacyDohProxy(dohTemplate);
+                    _legacyDohEndpoint = dohTemplate;
+                }
+                if (RunElevatedWorker("dns-legacy-apply", adapter.InterfaceIndex.ToString()))
+                {
+                    _legacyAdapterIndex = adapter.InterfaceIndex;
+                    MessageBox.Show(this, "Legacy DNS включён. Локальный прокси работает, пока NetShift запущен; при выходе DNS адаптера будет восстановлен.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+                    RefreshAdapters();
+                }
+            }
+            catch (Exception error)
+            {
+                if (_legacyAdapterIndex is null && _legacyDohProxy is not null)
+                {
+                    _ = _legacyDohProxy.DisposeAsync();
+                    _legacyDohProxy = null;
+                }
+                MessageBox.Show(this, error.Message, "Не удалось включить Legacy DNS", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            return;
+        }
+
+        StopLegacyDnsAndRestore();
         if (RunElevatedWorker("dns-apply", adapter.InterfaceIndex.ToString(), string.Join(',', addresses), dohTemplate))
         {
-            MessageBox.Show(this, "DNS-адреса применены и сохранены в Windows. Установленная DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "Native DNS применён и сохранён в Windows. DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
+        }
+    }
+
+    private void StopLegacyDnsAndRestore()
+    {
+        if (_legacyAdapterIndex is not null)
+        {
+            RunElevatedWorker("dns-legacy-restore");
+            _legacyAdapterIndex = null;
+        }
+        if (_legacyDohProxy is not null)
+        {
+            _legacyDohProxy.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _legacyDohProxy = null;
+            _legacyDohEndpoint = null;
         }
     }
 
@@ -726,6 +783,7 @@ public partial class MainWindow : Window
             "Вернуть DHCP", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirmation != MessageBoxResult.OK) return;
 
+        StopLegacyDnsAndRestore();
         if (RunElevatedWorker("dns-reset", adapter.InterfaceIndex.ToString()))
         {
             MessageBox.Show(this, "Для интерфейса включено получение DNS по DHCP.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);

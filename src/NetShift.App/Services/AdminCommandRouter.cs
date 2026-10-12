@@ -76,6 +76,33 @@ public static class AdminCommandRouter
                         "$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) }; if ($null -ne $key) { $key.Dispose() }");
                     break;
 
+                case "dns-legacy-apply":
+                    if (args.Length < 3 || !int.TryParse(args[2], out interfaceIndex) || interfaceIndex <= 0)
+                        throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
+                    RunPowerShell($"$ErrorActionPreference='Stop'; $i={interfaceIndex}; $a=Get-NetAdapter -InterfaceIndex $i -ErrorAction Stop; " +
+                        "$d4=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv4).ServerAddresses); " +
+                        "$d6=@((Get-DnsClientServerAddress -InterfaceIndex $i -AddressFamily IPv6).ServerAddresses); " +
+                        "$backup=[Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\LegacyDns'); " +
+                        "$backup.SetValue('InterfaceGuid',([guid]$a.InterfaceGuid).ToString('D'),[Microsoft.Win32.RegistryValueKind]::String); " +
+                        "$backup.SetValue('InterfaceIndex',$i,[Microsoft.Win32.RegistryValueKind]::DWord); " +
+                        "$backup.SetValue('IPv4',[string[]]$d4,[Microsoft.Win32.RegistryValueKind]::MultiString); " +
+                        "$backup.SetValue('IPv6',[string[]]$d6,[Microsoft.Win32.RegistryValueKind]::MultiString); " +
+                        "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns'); if($null -ne $native){$backup.SetValue('NativeEnabled',[int]$native.GetValue('Enabled',0),[Microsoft.Win32.RegistryValueKind]::DWord);$backup.SetValue('NativeGuid',[string]$native.GetValue('InterfaceGuid',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeAddresses',[string[]]$native.GetValue('Addresses'),[Microsoft.Win32.RegistryValueKind]::MultiString);$backup.SetValue('NativeDoh',[string]$native.GetValue('DohTemplate',''),[Microsoft.Win32.RegistryValueKind]::String);$backup.SetValue('NativeRevision',[long]$native.GetValue('Revision',0),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
+                        "$backup.SetValue('Enabled',1,[Microsoft.Win32.RegistryValueKind]::DWord); $backup.Dispose(); " +
+                        "$native=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns',$true); if($null -ne $native){$r=[long]$native.GetValue('Revision',0);$native.SetValue('Enabled',0,[Microsoft.Win32.RegistryValueKind]::DWord);$native.SetValue('Revision',($r+1),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose()}; " +
+                        "Set-DnsClientServerAddress -InterfaceIndex $i -ServerAddresses @('127.0.0.1','::1')");
+                    break;
+
+                case "dns-legacy-restore":
+                    RunPowerShell("$ErrorActionPreference='Stop'; $backup=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\LegacyDns',$true); " +
+                        "if($null -ne $backup -and [int]$backup.GetValue('Enabled',0) -eq 1){ $guid=[guid]$backup.GetValue('InterfaceGuid'); " +
+                        "$a=Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {$_.InterfaceGuid -eq $guid} | Select-Object -First 1; " +
+                        "if($null -ne $a){$d4=[string[]]$backup.GetValue('IPv4');$d6=[string[]]$backup.GetValue('IPv6');$all=@($d4)+@($d6); " +
+                        "if($all.Count -gt 0){Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ServerAddresses $all}else{Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ResetServerAddresses}}; " +
+                        "$native=[Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\Dns');$native.SetValue('Enabled',[int]$backup.GetValue('NativeEnabled',0),[Microsoft.Win32.RegistryValueKind]::DWord);$native.SetValue('InterfaceGuid',[string]$backup.GetValue('NativeGuid',''),[Microsoft.Win32.RegistryValueKind]::String);$native.SetValue('Addresses',[string[]]$backup.GetValue('NativeAddresses'),[Microsoft.Win32.RegistryValueKind]::MultiString);$native.SetValue('DohTemplate',[string]$backup.GetValue('NativeDoh',''),[Microsoft.Win32.RegistryValueKind]::String);$native.SetValue('Revision',([long]$native.GetValue('Revision',0)+1),[Microsoft.Win32.RegistryValueKind]::QWord);$native.Dispose(); " +
+                        "$backup.SetValue('Enabled',0,[Microsoft.Win32.RegistryValueKind]::DWord); }; if($null -ne $backup){$backup.Dispose()}");
+                    break;
+
                 case "dns-service-install-embedded":
                     InstallEmbeddedDnsService();
                     break;
