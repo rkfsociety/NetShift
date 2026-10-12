@@ -57,7 +57,7 @@ public static class AdminCommandRouter
                         .Append("$key = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('SOFTWARE\\NetShift\\Dns'); ")
                         .Append("$revision = [long]$key.GetValue('Revision', 0); ")
                         .Append("$key.SetValue('Enabled', 1, [Microsoft.Win32.RegistryValueKind]::DWord); ")
-                        .Append("$key.SetValue('InterfaceGuid', $interfaceGuid.ToString('D'), [Microsoft.Win32.RegistryValueKind]::String); ")
+                        .Append("$key.SetValue('InterfaceGuid', $interfaceGuid, [Microsoft.Win32.RegistryValueKind]::String); ")
                         .Append("$key.SetValue('Addresses', [string[]]@(").Append(string.Join(",", addresses.Select(PsLiteral))).Append("), [Microsoft.Win32.RegistryValueKind]::MultiString); ")
                         .Append("$key.SetValue('DohTemplate', ").Append(PsLiteral(dohTemplate)).Append(", [Microsoft.Win32.RegistryValueKind]::String); ")
                         .Append("$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord); $key.Dispose()");
