@@ -8,10 +8,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NetShift.App</RootNamespace>
     <AssemblyName>NetShift</AssemblyName>
-    <Version>0.3.013</Version>
+    <Version>0.3.014</Version>
+    <ApplicationIcon>Assets\NetShift.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup Condition="'$(NetShiftUpdateRepository)' != ''">
     <AssemblyMetadata Include="NetShiftUpdateRepository" Value="$(NetShiftUpdateRepository)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\NetShift.ico" />
+    <Resource Include="Assets\NetShift.png" />
   </ItemGroup>
   <ItemGroup Condition="'$(NetShiftDnsServicePath)' != '' and Exists('$(NetShiftDnsServicePath)')">
     <EmbeddedResource Include="$(NetShiftDnsServicePath)" LogicalName="NetShift.App.Payload.NetShift.DnsService.exe" />
