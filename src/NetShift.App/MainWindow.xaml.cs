@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Collections.ObjectModel;
@@ -10,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Media;
 using NetShift.App.Models;
 using NetShift.App.Services;
 using Microsoft.Win32;
@@ -205,7 +207,12 @@ public partial class MainWindow : Window
             : [];
 
         var selectedPath = StrategyComboBox.SelectedValue as string;
-        StrategyComboBox.ItemsSource = strategies.Select(path => new StrategyItem(Path.GetFileName(path), path)).ToArray();
+        StrategyComboBox.ItemsSource = strategies.Select(path =>
+        {
+            var fullPath = Path.GetFullPath(path);
+            var hasHealth = _settings.ZapretStrategyHealth.TryGetValue(HealthKey(fullPath), out var isHealthy);
+            return new StrategyItem(Path.GetFileName(path), fullPath, hasHealth ? isHealthy : null);
+        }).ToArray();
         StrategyComboBox.DisplayMemberPath = nameof(StrategyItem.Name);
         StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
         StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
@@ -308,6 +315,7 @@ public partial class MainWindow : Window
     {
         if (ServiceStatusText is null) return;
         var output = QueryWindowsService("zapret");
+        CheckActiveStrategyButton.IsEnabled = output?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true;
         if (output is null)
         {
             ServiceStatusText.Text = "Служба zapret: не установлена";
@@ -425,6 +433,14 @@ public partial class MainWindow : Window
         await Task.WhenAll(
             RefreshDnsAiProviderAsync(showError: false),
             CheckNetShiftUpdatesAsync(showError: false));
+
+        if (!_settings.InitialZapretCheckCompleted)
+        {
+            if (IsZapretServiceRunning())
+                await CheckActiveZapretStrategyAsync(isInitialCheck: true);
+            else
+                ZapretHealthStatusText.Text = "Первичная проверка zapret выполнится, когда его служба будет запущена.";
+        }
     }
 
     private void AppAutoStart_Click(object sender, RoutedEventArgs e)
@@ -794,13 +810,21 @@ public partial class MainWindow : Window
             ? $"Заменить установленную службу zapret стратегией {strategy.Name}? NetShift изменит её только если она установлена из выбранной папки или папки NetShift. Потребуются права администратора."
             : $"Установить стратегию {strategy.Name} как автоматическую службу Windows?\n\n{folder}\n\nПотребуются права администратора.";
         if (MessageBox.Show(this, message, "Установить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (RunElevatedWorker("zapret-service-install", strategy.Path)) RefreshServiceStatus();
+        if (RunElevatedWorker("zapret-service-install", strategy.Path))
+        {
+            RefreshServiceStatus();
+            _ = CheckActiveZapretStrategyAsync(isInitialCheck: !_settings.InitialZapretCheckCompleted);
+        }
     }
 
     private void StartService_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
-        if (RunElevatedWorker("zapret-service-start", folder)) RefreshServiceStatus();
+        if (RunElevatedWorker("zapret-service-start", folder))
+        {
+            RefreshServiceStatus();
+            _ = CheckActiveZapretStrategyAsync(isInitialCheck: !_settings.InitialZapretCheckCompleted);
+        }
     }
 
     private void StopService_Click(object sender, RoutedEventArgs e)
@@ -822,6 +846,97 @@ public partial class MainWindow : Window
     }
 
     private void RefreshServiceStatus_Click(object sender, RoutedEventArgs e) => RefreshServiceStatus();
+
+    private async void CheckActiveStrategy_Click(object sender, RoutedEventArgs e)
+    {
+        await CheckActiveZapretStrategyAsync(isInitialCheck: !_settings.InitialZapretCheckCompleted);
+    }
+
+    private async Task CheckActiveZapretStrategyAsync(bool isInitialCheck)
+    {
+        for (var attempt = 0; attempt < (isInitialCheck ? 5 : 1) && !IsZapretServiceRunning(); attempt++)
+            await Task.Delay(1000);
+
+        if (!IsZapretServiceRunning())
+        {
+            ZapretHealthStatusText.Text = "Проверка доступна только для запущенной службы zapret; служба DNS не затрагивается.";
+            return;
+        }
+
+        string? activeStrategyPath;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\zapret");
+            var strategyName = key?.GetValue("zapret-discord-youtube") as string;
+            var imagePath = key?.GetValue("ImagePath") as string;
+            var match = Regex.Match(imagePath ?? string.Empty, "^\\s*\\\"(?<path>[^\\\"]*winws\\.exe)\\\"|^\\s*(?<path>[^\\s]*winws\\.exe)", RegexOptions.IgnoreCase);
+            var binPath = match.Success ? Path.GetDirectoryName(match.Groups["path"].Value) : null;
+            var packageFolder = binPath is null ? null : Path.GetDirectoryName(binPath);
+            activeStrategyPath = string.IsNullOrWhiteSpace(strategyName) || packageFolder is null
+                ? null
+                : Path.GetFullPath(Path.Combine(packageFolder, strategyName + ".bat"));
+        }
+        catch
+        {
+            activeStrategyPath = null;
+        }
+
+        if (activeStrategyPath is null)
+        {
+            ZapretHealthStatusText.Text = "Не удалось определить стратегию работающей службы zapret.";
+            return;
+        }
+
+        CheckActiveStrategyButton.IsEnabled = false;
+        ZapretHealthStatusText.Text = "Проверяю доступ к Discord, YouTube и Google через активную стратегию…";
+        ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        try
+        {
+            var results = await Task.WhenAll(
+                ProbeZapretTargetAsync("Discord", "https://discord.com"),
+                ProbeZapretTargetAsync("YouTube", "https://www.youtube.com"),
+                ProbeZapretTargetAsync("Google", "https://www.google.com"));
+            var healthy = results.All(result => result.Reachable);
+            _settings.ZapretStrategyHealth[HealthKey(activeStrategyPath)] = healthy;
+            if (isInitialCheck) _settings.InitialZapretCheckCompleted = true;
+            SaveSettings();
+            UpdateZapretInventory();
+
+            var passed = results.Where(result => result.Reachable).Select(result => result.Name).ToArray();
+            var failed = results.Where(result => !result.Reachable).Select(result => result.Name).ToArray();
+            ZapretHealthStatusText.Text = failed.Length == 0
+                ? $"Активная стратегия {Path.GetFileNameWithoutExtension(activeStrategyPath)} работает: все адреса доступны."
+                : $"Активная стратегия {Path.GetFileNameWithoutExtension(activeStrategyPath)}: доступны {string.Join(", ", passed)}; нет ответа от {string.Join(", ", failed)}.";
+            ZapretHealthStatusText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
+        }
+        catch (Exception error)
+        {
+            ZapretHealthStatusText.Text = $"Не удалось проверить активную стратегию: {error.Message}";
+        }
+        finally
+        {
+            CheckActiveStrategyButton.IsEnabled = true;
+        }
+    }
+
+    private static bool IsZapretServiceRunning() =>
+        QueryWindowsService("zapret")?.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
+
+    private static async Task<(string Name, bool Reachable)> ProbeZapretTargetAsync(string name, string url)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(7) };
+        try
+        {
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            return (name, true);
+        }
+        catch
+        {
+            return (name, false);
+        }
+    }
 
     private void SavePackageSettings_Click(object sender, RoutedEventArgs e)
     {
@@ -1227,11 +1342,15 @@ public partial class MainWindow : Window
         public AppSettings() { }
         public string? ZapretFolder { get; set; }
         public bool CheckZapretUpdatesBeforeStart { get; set; }
+        public bool InitialZapretCheckCompleted { get; set; }
+        public Dictionary<string, bool> ZapretStrategyHealth { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private sealed record PackageChoice(string Name, string Value);
-    private sealed record StrategyItem(string Name, string Path)
+    private sealed record StrategyItem(string Name, string Path, bool? IsHealthy)
     {
+        public Visibility HealthVisibility => IsHealthy.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        public System.Windows.Media.Brush HealthBrush => IsHealthy == true ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
         public override string ToString() => Name;
     }
 }
