@@ -28,8 +28,15 @@ public static class NetShiftUpdateService
     {
         get
         {
+            var informationalVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            var versionMatch = Regex.Match(
+                informationalVersion ?? string.Empty,
+                "^(?<version>\\d+\\.\\d+\\.\\d+)",
+                RegexOptions.CultureInvariant);
+            if (versionMatch.Success) return versionMatch.Groups["version"].Value;
+
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version?.ToString(3) ?? "0.3.6";
+            return version?.ToString(3) ?? "0.3.007";
         }
     }
 
@@ -89,7 +96,8 @@ public static class NetShiftUpdateService
             if (digestMatch.Success) apiSha256 = digestMatch.Groups[1].Value.ToLowerInvariant();
         }
 
-        return new NetShiftUpdate(tag, latestVersion.ToString(), archiveName, archiveUrl, checksumUrl, archiveSize, apiSha256);
+        var versionText = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag[1..] : tag;
+        return new NetShiftUpdate(tag, versionText, archiveName, archiveUrl, checksumUrl, archiveSize, apiSha256);
     }
 
     public static async Task<string> DownloadAndExtractAsync(NetShiftUpdate update, IProgress<double>? progress, CancellationToken cancellationToken)
