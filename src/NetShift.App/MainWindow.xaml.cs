@@ -577,6 +577,7 @@ public partial class MainWindow : Window
     {
         if (Ipv4TextBox is null || ProviderComboBox.SelectedItem is not DnsProvider provider) return;
         DnsAddressSettingsPanel.Visibility = provider.RequiresManualAddressInput ? Visibility.Visible : Visibility.Collapsed;
+        DnsDohSettingsPanel.Visibility = provider.RequiresManualAddressInput ? Visibility.Visible : Visibility.Collapsed;
         _settings.DnsProviderName = provider.Name;
         SaveSettings();
         var ipv4 = SplitAddressPair(provider.Ipv4);

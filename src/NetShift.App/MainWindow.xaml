@@ -198,7 +198,7 @@
                   </Border>
                 </Grid>
 
-                <Grid Margin="0,26,0,0">
+                <Grid x:Name="DnsDohSettingsPanel" Margin="0,26,0,0">
                   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,0,0,8">
