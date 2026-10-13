@@ -207,7 +207,7 @@
                     <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <TextBox x:Name="ZapretFolderTextBox" IsReadOnly="True" VerticalContentAlignment="Center" />
-                  <Button Grid.Column="1" Content="Выбрать папку" Click="ChooseZapretFolder_Click" Margin="10,0,0,0" />
+                  <Button x:Name="ChooseZapretFolderButton" Grid.Column="1" Content="Выбрать папку" Click="ChooseZapretFolder_Click" Margin="10,0,0,0" />
                 </Grid>
                 <TextBlock x:Name="ZapretStatusText" Text="Папка zapret не выбрана" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="2,10,0,0" />
               </StackPanel>
@@ -223,7 +223,27 @@
                     <DataTemplate>
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="{Binding Name}" />
-                        <TextBlock Text="●" Foreground="{Binding HealthBrush}" Visibility="{Binding HealthVisibility}" Margin="8,0,0,0" />
+                        <Ellipse Width="8" Height="8" Fill="{Binding HealthBrush}" Visibility="{Binding HealthVisibility}"
+                                 Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{Binding HealthTooltip}">
+                          <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRecommended}" Value="True">
+                                  <DataTrigger.EnterActions>
+                                    <BeginStoryboard x:Name="RecommendedStrategyPulse">
+                                      <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.35" To="1" Duration="0:0:0.8" />
+                                      </Storyboard>
+                                    </BeginStoryboard>
+                                  </DataTrigger.EnterActions>
+                                  <DataTrigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="RecommendedStrategyPulse" />
+                                  </DataTrigger.ExitActions>
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Ellipse.Style>
+                        </Ellipse>
                       </StackPanel>
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
@@ -239,16 +259,16 @@
                   <Button Content="Обновить статус" Click="RefreshServiceStatus_Click" Margin="8,0,0,0" />
                 </WrapPanel>
                 <TextBlock x:Name="ServiceStatusText" Text="Служба zapret: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,12,0,0" />
-                <Button x:Name="CheckActiveStrategyButton" Content="Проверить активную стратегию" Click="CheckActiveStrategy_Click" HorizontalAlignment="Left" Margin="0,10,0,0" />
-                <TextBlock x:Name="ZapretHealthStatusText" Text="Проверка активной стратегии ещё не выполнялась." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,10,0,0" />
+                <Button x:Name="CheckActiveStrategyButton" Content="Проверить стратегии" Click="CheckActiveStrategy_Click" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                <TextBlock x:Name="ZapretHealthStatusText" Text="Проверка стратегий ещё не выполнялась." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,10,0,0" />
                 <Border Background="#0D1929" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,10,0,0">
                   <StackPanel>
                     <Grid>
                       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                      <TextBlock Text="Доступность сайтов через активную стратегию" FontWeight="SemiBold" />
+                      <TextBlock Text="Проверка доступности сайтов" FontWeight="SemiBold" />
                       <TextBlock x:Name="ZapretTestPhaseText" Grid.Column="1" Text="Ожидает проверки" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
                     </Grid>
-                    <TextBlock x:Name="ZapretTestStrategyText" Text="Проверяются Discord, YouTube и Google. Другие стратегии не запускаются." Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,8" />
+                    <TextBlock x:Name="ZapretTestStrategyText" Text="При остановленной службе стратегии проверяются по очереди; первая с доступом ко всем сайтам будет рекомендована. Работающую службу NetShift не прерывает." Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,8" />
                     <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
                     <UniformGrid Columns="3">
                       <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,6,0">
@@ -312,8 +332,8 @@
                 </Grid>
                 <WrapPanel Margin="0,14,0,0">
                   <Button x:Name="SavePackageSettingsButton" Content="Сохранить параметры" Click="SavePackageSettings_Click" />
-                  <Button Content="Обновить IPSet" Click="UpdateIpSet_Click" Margin="8,0,0,0" />
-                  <Button Content="Проверить новую версию" Click="CheckRelease_Click" Margin="8,0,0,0" />
+                  <Button x:Name="UpdateIpSetButton" Content="Обновить IPSet" Click="UpdateIpSet_Click" Margin="8,0,0,0" />
+                  <Button x:Name="CheckReleaseButton" Content="Проверить новую версию" Click="CheckRelease_Click" Margin="8,0,0,0" />
                 </WrapPanel>
               </StackPanel>
             </Border>
@@ -332,13 +352,13 @@
                   <ComboBox x:Name="FakeTargetComboBox" Grid.Column="0" />
                   <ComboBox x:Name="FakeFileComboBox" Grid.Column="1" />
                   <TextBlock Grid.Column="3" Text="Замена активного UDP fake-файла" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" />
-                  <Button Grid.Column="4" Content="Заменить" Click="ReplaceFake_Click" Margin="8,0,0,0" />
+                  <Button x:Name="ReplaceFakeButton" Grid.Column="4" Content="Заменить" Click="ReplaceFake_Click" Margin="8,0,0,0" />
                 </Grid>
                 <WrapPanel Margin="0,14,0,0">
-                  <Button Content="Запустить диагностику" Click="RunDiagnostics_Click" />
-                  <Button Content="Запустить тесты zapret" Click="RunUpstreamTests_Click" Margin="8,0,0,0" />
-                  <Button Content="Проверить hosts" Click="CheckHosts_Click" Margin="8,0,0,0" />
-                  <Button Content="Восстановить hosts" Click="RestoreHostsBackup_Click" Margin="8,0,0,0" />
+                  <Button x:Name="RunDiagnosticsButton" Content="Запустить диагностику" Click="RunDiagnostics_Click" />
+                  <Button x:Name="RunUpstreamTestsButton" Content="Запустить тесты zapret" Click="RunUpstreamTests_Click" Margin="8,0,0,0" />
+                  <Button x:Name="CheckHostsButton" Content="Проверить hosts" Click="CheckHosts_Click" Margin="8,0,0,0" />
+                  <Button x:Name="RestoreHostsButton" Content="Восстановить hosts" Click="RestoreHostsBackup_Click" Margin="8,0,0,0" />
                 </WrapPanel>
                 <TextBox x:Name="ToolsOutputTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                          MinHeight="70" MaxHeight="150" Margin="0,12,0,0" />

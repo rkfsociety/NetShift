@@ -2,13 +2,16 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Reflection;
 using System.Windows;
 using Microsoft.Win32;
+using NetShift.App.Models;
 
 namespace NetShift.App.Services;
 
@@ -186,6 +189,11 @@ public static class AdminCommandRouter
                 case "zapret-run-tests":
                     if (args.Length < 3) throw new InvalidOperationException("Не указана папка zapret.");
                     StartUpstreamTests(RequireZapretFolder(args[2]));
+                    break;
+
+                case "zapret-test-strategies":
+                    if (args.Length < 4) throw new InvalidOperationException("Не указана папка zapret или файл статуса проверки.");
+                    RunZapretStrategyTestSweep(RequireZapretFolder(args[2]), RequireZapretTestProgressPath(args[3]));
                     break;
 
                 case "zapret-package-install":
@@ -581,6 +589,198 @@ public static class AdminCommandRouter
             UseShellExecute = true
         };
         if (Process.Start(startInfo) is null) throw new InvalidOperationException("Не удалось запустить официальный тестовый скрипт.");
+    }
+
+    private static void RunZapretStrategyTestSweep(string folder, string progressPath)
+    {
+        var strategies = Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
+            .ToArray();
+        if (strategies.Length == 0) throw new InvalidOperationException("В выбранной папке не найдены стратегии general*.bat.");
+
+        EnsureZapretCanBeTested();
+        var testedCount = 0;
+        string? recommendedPath = null;
+        var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, EmptyTargetResults(),
+            $"Подготовка проверки {strategies.Length} стратегий.");
+        WriteZapretTestProgress(progressPath, progress);
+
+        foreach (var strategyPath in strategies)
+        {
+            EnsureZapretCanBeTested();
+            var strategyName = Path.GetFileNameWithoutExtension(strategyPath);
+            var targetResults = EmptyTargetResults();
+            Process? winws = null;
+            var passed = false;
+            string? failure = null;
+            progress = new ZapretTestProgress(strategyPath, "starting", testedCount + 1, strategies.Length, targetResults,
+                $"Запускаю временно {strategyName}.", recommendedPath);
+            WriteZapretTestProgress(progressPath, progress);
+
+            try
+            {
+                var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+                var startInfo = new ProcessStartInfo(executable)
+                {
+                    Arguments = BuildStrategyArguments(strategyPath, folder),
+                    WorkingDirectory = folder,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                winws = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить winws.exe.");
+                Thread.Sleep(TimeSpan.FromSeconds(2));
+                if (winws.HasExited)
+                    throw new InvalidOperationException($"winws.exe завершился с кодом {winws.ExitCode}.");
+
+                progress = progress with { Phase = "checking", Message = $"Проверяю сайты через {strategyName}…" };
+                WriteZapretTestProgress(progressPath, progress);
+                var targetsLock = new object();
+                (string Name, string Url)[] targetChecks =
+                [
+                    ("Discord", "https://discord.com"),
+                    ("YouTube", "https://www.youtube.com"),
+                    ("Google", "https://www.google.com")
+                ];
+                var checks = targetChecks.Select(async target =>
+                {
+                    var reachable = await ProbeZapretTargetAsync(target.Url).ConfigureAwait(false);
+                    lock (targetsLock)
+                    {
+                        targetResults[target.Name] = reachable;
+                        progress = progress with { Targets = new Dictionary<string, bool?>(targetResults), Message = $"{strategyName}: проверка {target.Name} завершена." };
+                        WriteZapretTestProgress(progressPath, progress);
+                    }
+                    return (target.Name, Reachable: reachable);
+                }).ToArray();
+                var results = Task.WhenAll(checks).GetAwaiter().GetResult();
+                passed = results.All(result => result.Reachable) && !winws.HasExited;
+                if (!passed)
+                {
+                    if (winws.HasExited)
+                        failure = $"winws.exe завершился во время проверки с кодом {winws.ExitCode}.";
+                    else
+                    {
+                        var failedTargets = results.Where(result => !result.Reachable).Select(result => result.Name);
+                        failure = $"Нет ответа от: {string.Join(", ", failedTargets)}.";
+                    }
+                }
+            }
+            catch (Exception error)
+            {
+                failure = error.Message;
+            }
+            finally
+            {
+                if (winws is not null)
+                {
+                    try
+                    {
+                        if (!winws.HasExited)
+                        {
+                            try { winws.Kill(entireProcessTree: true); }
+                            catch (InvalidOperationException) when (winws.HasExited) { }
+                            if (!winws.WaitForExit(10_000))
+                                throw new TimeoutException($"Не удалось остановить временную стратегию {strategyName}.");
+                        }
+                    }
+                    finally { winws.Dispose(); }
+                }
+            }
+
+            testedCount++;
+            if (passed)
+            {
+                recommendedPath = Path.GetFullPath(strategyPath);
+                progress = new ZapretTestProgress(strategyPath, "recommended", testedCount, strategies.Length,
+                    new Dictionary<string, bool?>(targetResults), $"Все сайты доступны. Рекомендуем {strategyName}.", recommendedPath);
+                WriteZapretTestProgress(progressPath, progress);
+                break;
+            }
+
+            progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length,
+                new Dictionary<string, bool?>(targetResults), $"{strategyName} не прошла проверку. {failure}");
+            WriteZapretTestProgress(progressPath, progress);
+        }
+
+        progress = progress with
+        {
+            Phase = "completed",
+            StrategyIndex = testedCount,
+            Message = recommendedPath is null
+                ? $"Подходящая стратегия не найдена. Проверено: {testedCount} из {strategies.Length}."
+                : $"Рекомендуемая стратегия: {Path.GetFileNameWithoutExtension(recommendedPath)}. Проверка завершена.",
+            RecommendedPath = recommendedPath,
+            Completed = true
+        };
+        WriteZapretTestProgress(progressPath, progress);
+    }
+
+    private static void EnsureZapretCanBeTested()
+    {
+        var service = RunSc(["query", "zapret"], allowFailure: true).Output;
+        if (Regex.IsMatch(service, @"STATE\s*:\s*[234]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            throw new InvalidOperationException("Нельзя перебирать стратегии, пока служба zapret работает или запускается. Остановите её и повторите проверку.");
+
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            using (process)
+            {
+                string? path;
+                try { path = process.MainModule?.FileName; }
+                catch { path = null; }
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(path)
+                    ? "Найден запущенный winws.exe. Остановите активную стратегию перед проверкой списка."
+                    : $"Уже работает winws.exe ({path}). Остановите активную стратегию перед проверкой списка.");
+            }
+        }
+    }
+
+    private static Dictionary<string, bool?> EmptyTargetResults() => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Discord"] = null,
+        ["YouTube"] = null,
+        ["Google"] = null
+    };
+
+    private static async Task<bool> ProbeZapretTargetAsync(string url)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(7) };
+        try
+        {
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static string RequireZapretTestProgressPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var tempFolder = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fileName = Path.GetFileName(fullPath);
+        if (!fullPath.StartsWith(tempFolder, StringComparison.OrdinalIgnoreCase) ||
+            !Regex.IsMatch(fileName, "^NetShift-zapret-test-[0-9a-f]{32}\\.json$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            throw new InvalidOperationException("Недопустимый файл статуса проверки стратегий.");
+        return fullPath;
+    }
+
+    private static void WriteZapretTestProgress(string path, ZapretTestProgress progress)
+    {
+        var temporaryPath = path + ".tmp";
+        var json = JsonSerializer.Serialize(progress);
+        for (var attempt = 0; ; attempt++)
+        {
+            File.WriteAllText(temporaryPath, json, new UTF8Encoding(false));
+            try
+            {
+                File.Move(temporaryPath, path, overwrite: true);
+                return;
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                Thread.Sleep(25);
+            }
+        }
     }
 
     private static bool IsValidHostsLine(string line)
