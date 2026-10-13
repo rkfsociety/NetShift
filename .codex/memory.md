@@ -44,7 +44,7 @@
 - Сборка UI из корня репозитория: `dotnet build src/NetShift.App/NetShift.App.csproj`.
 - Сборка DNS-службы: `dotnet build src/NetShift.DnsService/DnsService.csproj`.
 - Регрессионные проверки: `dotnet run --project tests/NetShift.RegressionChecks/NetShift.RegressionChecks.csproj`. Это консольная программа, а не тестовый framework: она проверяет Legacy DNS backup/restore, timeout процесса, синтаксис скрипта обновления и распознавание/удаление резервной копии при подтверждении обновления. Для неё нужен Windows PowerShell 5.1; release workflow запускается на `windows-latest`.
-- Release workflow — `.github/workflows/release.yml`: push в `main` сравнивает app `<Version>` с Git-тегами `vMAJOR.MINOR.PATCH`, создаёт и отправляет тег при более новой версии, запускает регрессионные проверки, публикует self-contained `win-x64` DNS-службу и приложение, затем создаёт GitHub Release. Публикация приложения передаёт version и встраивает exe службы.
+- Release workflow — `.github/workflows/release.yml`: push в `main` сравнивает app `<Version>` с Git-тегами `vMAJOR.MINOR.PATCH`, создаёт и отправляет тег при более новой версии, запускает регрессионные проверки, публикует self-contained `win-x64` DNS-службу и приложение, затем создаёт GitHub Release. Последний шаг удаляет все более старые GitHub Releases и version-теги, оставляя только самый новый; перед push с новой версией пользователь должен отдельно подтвердить это удаление. Публикация приложения передаёт version и встраивает exe службы.
 - Отдельный `Version` приложения в `src/NetShift.App/NetShift.App.csproj` определяет версию релиза; версия DNS payload задаётся `src/NetShift.DnsService/DnsService.csproj`. Постоянное правило обновления версий находится в `.codex/rules.md`.
 
 ## Ориентир для будущих изменений
