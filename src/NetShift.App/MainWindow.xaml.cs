@@ -130,7 +130,11 @@ public partial class MainWindow : Window
         if (page is not ("basic" or "dns" or "zapret" or "settings"))
             page = "dns";
 
-        BasicPage.Visibility = page == "basic" ? Visibility.Visible : Visibility.Collapsed;
+        var isBasicMode = page == "basic";
+        SidebarPanel.Visibility = isBasicMode ? Visibility.Collapsed : Visibility.Visible;
+        SidebarColumn.Width = isBasicMode ? new GridLength(0) : new GridLength(272);
+
+        BasicPage.Visibility = isBasicMode ? Visibility.Visible : Visibility.Collapsed;
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
         ZapretPage.Visibility = page == "zapret" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
