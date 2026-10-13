@@ -201,7 +201,7 @@ public partial class MainWindow : Window
             {
                 _exitRequested = false;
                 ShowFromTray();
-                MessageBox.Show(this, "Не удалось вернуть DNS адаптера. NetShift останется запущен, чтобы не потерять локальный DNS-прокси.",
+                ThemedDialog.Show(this, "Не удалось вернуть DNS адаптера. NetShift останется запущен, чтобы не потерять локальный DNS-прокси.",
                     "Legacy DNS ещё активен", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -215,7 +215,7 @@ public partial class MainWindow : Window
             _allowClose = false;
             _exitRequested = false;
             ShowFromTray();
-            MessageBox.Show(this, error.Message, "Не удалось безопасно завершить NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "Не удалось безопасно завершить NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -595,7 +595,7 @@ public partial class MainWindow : Window
             {
                 if (!await RunElevatedWorkerAsync("dns-legacy-restore"))
                 {
-                    MessageBox.Show(this, "Сначала восстановите предыдущие DNS-настройки Legacy, чтобы не потерять подключение.",
+                    ThemedDialog.Show(this, "Сначала восстановите предыдущие DNS-настройки Legacy, чтобы не потерять подключение.",
                         "Нужно восстановить DNS", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -652,7 +652,7 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             AppAutoStartCheckBox.IsChecked = !enabled;
-            MessageBox.Show(this, error.Message, "Автозапуск NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "Автозапуск NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -731,7 +731,7 @@ public partial class MainWindow : Window
     {
         if (!NetShiftBootstrapper.HasEmbeddedDnsService())
         {
-            MessageBox.Show(this, "В этой сборке нет встроенного файла DNS-службы. Скачайте приложение из релиза NetShift.", "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "В этой сборке нет встроенного файла DNS-службы. Скачайте приложение из релиза NetShift.", "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -745,7 +745,7 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             DnsServiceStatusText.Text = "Установка DNS-службы не завершена.";
-            MessageBox.Show(this, error.Message, "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "DNS-служба", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -755,7 +755,7 @@ public partial class MainWindow : Window
 
     private async void RemoveDnsService_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 "Удалить службу NetShift DNS? Системные DNS-адреса останутся настроенными в Windows, но служба больше не будет восстанавливать профиль при запуске компьютера.",
                 "Удалить DNS-службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
             return;
@@ -797,7 +797,7 @@ public partial class MainWindow : Window
             UpdateStatusText.Text = "Не удалось проверить обновления NetShift";
             UpdateButton.Content = "Повторить проверку";
             if (showError)
-                MessageBox.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ThemedDialog.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -814,7 +814,7 @@ public partial class MainWindow : Window
         }
 
         var update = _availableUpdate;
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 $"Скачать и установить NetShift {update.Tag}? Приложение закроется и автоматически запустится после обновления.",
                 "Обновление NetShift", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             return;
@@ -837,7 +837,7 @@ public partial class MainWindow : Window
         {
             UpdateStatusText.Text = "Установка обновления не завершена";
             UpdateButton.IsEnabled = true;
-            MessageBox.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -862,7 +862,7 @@ public partial class MainWindow : Window
         {
             DnsProviderStatusText.Text = "DNS-AI: сайт недоступен; используются встроенные резервные значения.";
             if (showError)
-                MessageBox.Show(this, $"Не удалось обновить данные DNS-AI. Используются резервные значения.\n\n{error.Message}",
+                ThemedDialog.Show(this, $"Не удалось обновить данные DNS-AI. Используются резервные значения.\n\n{error.Message}",
                     "DNS-AI", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -884,7 +884,7 @@ public partial class MainWindow : Window
     {
         if (AdapterComboBox.SelectedItem is not NetworkAdapterInfo adapter)
         {
-            MessageBox.Show(this, "Сначала выберите сетевой адаптер.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "Сначала выберите сетевой адаптер.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -899,7 +899,7 @@ public partial class MainWindow : Window
         if (addresses.Length == 0 || !HasFamily(ipv4Addresses, AddressFamily.InterNetwork) ||
             !HasFamily(ipv6Addresses, AddressFamily.InterNetworkV6))
         {
-            MessageBox.Show(this, "Проверьте адреса: в поле IPv4 укажите только IPv4, в поле IPv6 — только IPv6. Нужен хотя бы один адрес.",
+            ThemedDialog.Show(this, "Проверьте адреса: в поле IPv4 укажите только IPv4, в поле IPv6 — только IPv6. Нужен хотя бы один адрес.",
                 "Проверьте адреса", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -908,11 +908,11 @@ public partial class MainWindow : Window
             (!Uri.TryCreate(dohTemplate, UriKind.Absolute, out var dohUri) || dohUri.Scheme != Uri.UriSchemeHttps ||
              !string.IsNullOrEmpty(dohUri.UserInfo) || !string.IsNullOrEmpty(dohUri.Fragment)))
         {
-            MessageBox.Show(this, "Укажите корректный HTTPS-шаблон DoH.", "Проверьте шаблон DoH", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedDialog.Show(this, "Укажите корректный HTTPS-шаблон DoH.", "Проверьте шаблон DoH", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var confirmation = MessageBox.Show(this,
+        var confirmation = ThemedDialog.Show(this,
             $"Заменить DNS на выбранном интерфейсе «{adapter.Name}»?\n\n{string.Join("\n", addresses)}" +
             (legacyMode ? $"\n\nРежим Legacy: локальный прокси и DoH {dohTemplate}. При выходе NetShift прежние DNS-настройки будут восстановлены." :
                 dohTemplate.Length == 0 ? "" : $"\n\nDoH через Windows DNS Client: {dohTemplate}\nОткат на незашифрованный DNS выключен.") +
@@ -936,7 +936,7 @@ public partial class MainWindow : Window
                     _settings.NativeDnsMode = false;
                     _settings.SupportIPv6 = SupportIPv6CheckBox.IsChecked == true;
                     SaveSettings();
-                    MessageBox.Show(this, "Legacy DNS включён. Локальный прокси работает, пока NetShift запущен; при выходе DNS адаптера будет восстановлен.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ThemedDialog.Show(this, "Legacy DNS включён. Локальный прокси работает, пока NetShift запущен; при выходе DNS адаптера будет восстановлен.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
                     RefreshAdapters();
                 }
                 else if (_legacyAdapterIndex is null && _legacyDohProxy is not null)
@@ -953,7 +953,7 @@ public partial class MainWindow : Window
                     await _legacyDohProxy.DisposeAsync();
                     _legacyDohProxy = null;
                 }
-                MessageBox.Show(this, error.Message, "Не удалось включить Legacy DNS", MessageBoxButton.OK, MessageBoxImage.Error);
+                ThemedDialog.Show(this, error.Message, "Не удалось включить Legacy DNS", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             return;
         }
@@ -964,7 +964,7 @@ public partial class MainWindow : Window
             _settings.NativeDnsMode = true;
             _settings.SupportIPv6 = SupportIPv6CheckBox.IsChecked == true;
             SaveSettings();
-            MessageBox.Show(this, "Native DNS применён и сохранён в Windows. DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "Native DNS применён и сохранён в Windows. DNS-служба восстановит этот профиль при запуске компьютера.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
         }
     }
@@ -989,11 +989,11 @@ public partial class MainWindow : Window
     {
         if (AdapterComboBox.SelectedItem is not NetworkAdapterInfo adapter)
         {
-            MessageBox.Show(this, "Сначала выберите сетевой адаптер.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "Сначала выберите сетевой адаптер.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var confirmation = MessageBox.Show(this,
+        var confirmation = ThemedDialog.Show(this,
             $"Вернуть DNS по DHCP для «{adapter.Name}»? Это заменит вручную заданные DNS-адреса на автоматические.",
             "Вернуть DHCP", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirmation != MessageBoxResult.OK) return;
@@ -1003,7 +1003,7 @@ public partial class MainWindow : Window
         {
             _settings.NativeDnsMode = false;
             SaveSettings();
-            MessageBox.Show(this, "Для интерфейса включено получение DNS по DHCP.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "Для интерфейса включено получение DNS по DHCP.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Information);
             RefreshAdapters();
         }
     }
@@ -1051,19 +1051,19 @@ public partial class MainWindow : Window
                     var latest = await ZapretReleaseService.GetLatestReleaseInfoAsync(CancellationToken.None);
                     var installed = ReadZapretVersion(ZapretFolderTextBox.Text.Trim());
                     if (installed is not null && !installed.Equals(latest.Version, StringComparison.OrdinalIgnoreCase) &&
-                        MessageBox.Show(this,
+                        ThemedDialog.Show(this,
                             $"Доступен релиз {latest.Tag}, а установлена версия {installed}. Запустить установленную стратегию? Нажмите «Нет», чтобы сначала скачать релиз через NetShift.",
                             "Доступно обновление", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes)
                         return;
                 }
                 catch (Exception error)
                 {
-                    if (MessageBox.Show(this, $"Не удалось проверить релиз GitHub:\n{error.Message}\n\nЗапустить установленную стратегию?",
+                    if (ThemedDialog.Show(this, $"Не удалось проверить релиз GitHub:\n{error.Message}\n\nЗапустить установленную стратегию?",
                             "Проверка релиза недоступна", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                         return;
                 }
             }
-            var confirmation = MessageBox.Show(this,
+            var confirmation = ThemedDialog.Show(this,
                 $"Запустить {strategy.Name}? Скрипт Flowseal изменит обработку сетевого трафика и может включить TCP timestamps. Windows запросит права администратора.",
                 "Запуск zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (confirmation != MessageBoxResult.OK) return;
@@ -1077,7 +1077,7 @@ public partial class MainWindow : Window
     {
         var folder = ZapretFolderTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(folder)) return;
-        var confirmation = MessageBox.Show(this,
+        var confirmation = ThemedDialog.Show(this,
             "Остановить winws.exe, запущенный из выбранной папки? Зарегистрированная служба Windows этим действием не удаляется.",
             "Остановить ручной запуск", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
         if (confirmation == MessageBoxResult.OK && await RunElevatedWorkerAsync("zapret-stop", folder))
@@ -1092,7 +1092,7 @@ public partial class MainWindow : Window
         var message = isInstalled
             ? $"Заменить установленную службу zapret стратегией {strategy.Name}? NetShift изменит её только если она установлена из выбранной папки или папки NetShift. Потребуются права администратора."
             : $"Установить стратегию {strategy.Name} как автоматическую службу Windows?\n\n{folder}\n\nПотребуются права администратора.";
-        if (MessageBox.Show(this, message, "Установить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+        if (ThemedDialog.Show(this, message, "Установить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-service-install", strategy.Path))
         {
             await RefreshServiceStatusAsync();
@@ -1113,7 +1113,7 @@ public partial class MainWindow : Window
     private async void StopService_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
-        if (MessageBox.Show(this, "Остановить службу zapret? Это временно прекратит работу выбранной стратегии.",
+        if (ThemedDialog.Show(this, "Остановить службу zapret? Это временно прекратит работу выбранной стратегии.",
                 "Остановить службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-service-stop", folder)) await RefreshServiceStatusAsync();
     }
@@ -1122,7 +1122,7 @@ public partial class MainWindow : Window
     {
         if (!TryGetZapretFolder(out var folder)) return;
         if (await QueryWindowsServiceAsync("zapret") is null) { await RefreshServiceStatusAsync(); return; }
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 $"Остановить и удалить службу zapret из выбранной папки или папки NetShift?\n\nТекущий пакет: {folder}\n\nСлужбы и процессы других программ не затрагиваются.",
                 "Удалить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-service-remove", folder)) await RefreshServiceStatusAsync();
@@ -1446,17 +1446,17 @@ public partial class MainWindow : Window
         if (GameFilterModeComboBox.SelectedValue is not string mode || IpSetModeComboBox.SelectedValue is not string ipSetMode ||
             !IsValidPortRange(GameFilterTcpTextBox.Text) || !IsValidPortRange(GameFilterUdpTextBox.Text))
         {
-            MessageBox.Show(this, "Укажите диапазоны TCP и UDP. Примеры: 80, 1024-65535 или 1024-1934,1936-65535.",
+            ThemedDialog.Show(this, "Укажите диапазоны TCP и UDP. Примеры: 80, 1024-65535 или 1024-1934,1936-65535.",
                 "Проверьте параметры", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (ipSetMode == "loaded" && ReadIpSetMode(folder) != "loaded" && !File.Exists(Path.Combine(folder, "lists", "ipset-all.txt.backup")))
         {
-            MessageBox.Show(this, "Резервного IPSet нет. Сначала нажмите «Обновить IPSet», затем выберите загруженный список.",
+            ThemedDialog.Show(this, "Резервного IPSet нет. Сначала нажмите «Обновить IPSet», затем выберите загруженный список.",
                 "Нет списка IPSet", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 "Сохранить игровой фильтр, режим IPSet и проверку последнего релиза перед запуском? Изменение фильтра вступит в силу после перезапуска стратегии.",
                 "Сохранить параметры zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-settings-save", folder, mode, GameFilterTcpTextBox.Text.Trim(), GameFilterUdpTextBox.Text.Trim(), ipSetMode))
@@ -1491,7 +1491,7 @@ public partial class MainWindow : Window
                 UpdateZapretInventory();
             }
         }
-        catch (Exception error) { MessageBox.Show(this, error.Message, "Не удалось обновить IPSet", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception error) { ThemedDialog.Show(this, error.Message, "Не удалось обновить IPSet", MessageBoxButton.OK, MessageBoxImage.Error); }
         finally { DownloadStatusText.Text = ""; }
     }
 
@@ -1499,7 +1499,7 @@ public partial class MainWindow : Window
     {
         if (!TryGetZapretFolder(out var folder) || FakeTargetComboBox.SelectedValue is not string target || FakeFileComboBox.SelectedItem is not string fakeFile) return;
         var targetName = target == "discord" ? "Discord UDP" : "игровой UDP";
-        if (MessageBox.Show(this, $"Заменить активный fake-файл для {targetName} на {fakeFile}? Текущий активный файл будет перезаписан.",
+        if (ThemedDialog.Show(this, $"Заменить активный fake-файл для {targetName} на {fakeFile}? Текущий активный файл будет перезаписан.",
                 "Заменить fake-файл", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-fake-replace", folder, target, fakeFile)) SetToolsOutput($"Активный файл для {targetName} заменён на {fakeFile}.");
     }
@@ -1553,7 +1553,7 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             DownloadStatusText.Text = "Загрузка или проверка релиза не завершилась.";
-            MessageBox.Show(this, error.Message, "Не удалось скачать релиз zapret", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "Не удалось скачать релиз zapret", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -1586,9 +1586,9 @@ public partial class MainWindow : Window
                 : installed.Equals(release.Version, StringComparison.OrdinalIgnoreCase) ? $"Установлена последняя версия {release.Tag}."
                 : $"Последний релиз GitHub: {release.Tag}.\nВ выбранной папке установлена версия {installed}.";
             DownloadStatusText.Text = message.Replace('\n', ' ');
-            MessageBox.Show(this, message, "Проверка обновлений", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, message, "Проверка обновлений", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        catch (Exception error) { MessageBox.Show(this, error.Message, "Не удалось проверить релиз", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception error) { ThemedDialog.Show(this, error.Message, "Не удалось проверить релиз", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private async void RunDiagnostics_Click(object sender, RoutedEventArgs e)
@@ -1601,7 +1601,7 @@ public partial class MainWindow : Window
         }
         catch (Exception error)
         {
-            MessageBox.Show(this, error.Message, "Не удалось выполнить диагностику", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedDialog.Show(this, error.Message, "Не удалось выполнить диагностику", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -1611,10 +1611,10 @@ public partial class MainWindow : Window
         var script = Path.Combine(folder, "utils", "test zapret.ps1");
         if (!File.Exists(script))
         {
-            MessageBox.Show(this, "В выбранном пакете не найден официальный скрипт utils/test zapret.ps1.", "Тесты недоступны", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "В выбранном пакете не найден официальный скрипт utils/test zapret.ps1.", "Тесты недоступны", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 "Откроется PowerShell с официальными тестами Flowseal. Скрипт проверяет сетевые адреса, может временно менять IPSet и останавливать/перезапускать winws, затем сохраняет отчёт. Для записи в папку пакета потребуется подтверждение администратора.",
                 "Запустить тесты", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
         if (await RunElevatedWorkerAsync("zapret-run-tests", folder))
@@ -1641,7 +1641,7 @@ public partial class MainWindow : Window
                 return;
             }
             var preview = string.Join(Environment.NewLine, missing.Take(8));
-            var choice = MessageBox.Show(this,
+            var choice = ThemedDialog.Show(this,
                 $"В системный hosts будут добавлены отсутствующие записи: {missing.Length} из {entries.Length}. Это изменит разрешение адресов перечисленных доменов. NetShift сначала создаст резервную копию.\n\n{preview}{(missing.Length > 8 ? "\n…" : string.Empty)}\n\nДобавить?",
                 "Обновить hosts", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (choice != MessageBoxResult.Yes) { DownloadStatusText.Text = "Обновление hosts отменено."; return; }
@@ -1654,7 +1654,7 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             DownloadStatusText.Text = "Проверка hosts не завершилась.";
-            MessageBox.Show(this, error.Message, "Не удалось проверить hosts", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "Не удалось проверить hosts", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1666,10 +1666,10 @@ public partial class MainWindow : Window
             : null;
         if (backup is null)
         {
-            MessageBox.Show(this, "Резервные копии hosts, созданные NetShift, не найдены.", "Нет резервной копии", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Show(this, "Резервные копии hosts, созданные NetShift, не найдены.", "Нет резервной копии", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show(this,
+        if (ThemedDialog.Show(this,
                 $"Восстановить системный hosts из последней резервной копии? Текущий hosts также будет сохранён перед восстановлением.\n\n{Path.GetFileName(backup)}",
                 "Восстановить hosts", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         try
@@ -1677,7 +1677,7 @@ public partial class MainWindow : Window
         if (await RunElevatedWorkerAsync("zapret-hosts-restore", backup, ComputeFileSha256(backup)))
                 SetToolsOutput($"Системный hosts восстановлен из {Path.GetFileName(backup)}. Предыдущее содержимое также сохранено.");
         }
-        catch (Exception error) { MessageBox.Show(this, error.Message, "Не удалось восстановить hosts", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception error) { ThemedDialog.Show(this, error.Message, "Не удалось восстановить hosts", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private static string NormalizeHostsLine(string line) => string.Join(' ', line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
@@ -1693,7 +1693,7 @@ public partial class MainWindow : Window
         folder = ZapretFolderTextBox.Text.Trim();
         if (!Directory.Exists(folder) || !File.Exists(Path.Combine(folder, "service.bat")) || !File.Exists(Path.Combine(folder, "bin", "winws.exe")))
         {
-            MessageBox.Show(this, "Сначала укажите папку с установленным пакетом zapret или скачайте последний релиз.",
+            ThemedDialog.Show(this, "Сначала укажите папку с установленным пакетом zapret или скачайте последний релиз.",
                 "Пакет не выбран", MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }
@@ -1707,7 +1707,7 @@ public partial class MainWindow : Window
         var executable = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executable))
         {
-            MessageBox.Show(this, "Не удалось определить путь к приложению.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, "Не удалось определить путь к приложению.", "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
 
@@ -1732,12 +1732,12 @@ public partial class MainWindow : Window
             {
                 try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
                 await process.WaitForExitAsync();
-                MessageBox.Show(this, "Административная операция не завершилась за 10 минут и была остановлена.",
+                ThemedDialog.Show(this, "Административная операция не завершилась за 10 минут и была остановлена.",
                     "NetShift", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             if (process.ExitCode == 0) return true;
-            MessageBox.Show(this, "Действие завершилось с ошибкой. Проверьте сообщение административного процесса и статус сети.",
+            ThemedDialog.Show(this, "Действие завершилось с ошибкой. Проверьте сообщение административного процесса и статус сети.",
                 "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         catch (System.ComponentModel.Win32Exception error) when (error.NativeErrorCode == 1223)
@@ -1746,7 +1746,7 @@ public partial class MainWindow : Window
         }
         catch (Exception error)
         {
-            MessageBox.Show(this, error.Message, "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(this, error.Message, "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         return false;
     }

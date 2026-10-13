@@ -76,7 +76,7 @@ internal static class NetShiftBootstrapper
         catch { }
 
         if (desktopError is not null)
-            System.Windows.MessageBox.Show(
+            NetShift.App.ThemedDialog.Show(null,
                 $"Приложение установлено, но ярлык на рабочем столе создать не удалось: {desktopError.Message}",
                 "NetShift", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
     }

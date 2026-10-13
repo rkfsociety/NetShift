@@ -222,7 +222,7 @@ public static class AdminCommandRouter
         catch (Exception error)
         {
             Environment.ExitCode = 1;
-            MessageBox.Show(error.Message, "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show(null, error.Message, "NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
             return true;
         }
     }
