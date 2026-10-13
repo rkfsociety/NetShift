@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -10,10 +9,10 @@ using System.Text.RegularExpressions;
 
 namespace NetShift.App.Services;
 
-public sealed record NetShiftUpdate(string Tag, string Version, string ArchiveName, string ArchiveUrl, string ChecksumUrl, long ArchiveSize, string? ApiSha256);
+public sealed record NetShiftUpdate(string Tag, string Version, string ExecutableName, string ExecutableUrl, long ExecutableSize, string Sha256);
 public static class NetShiftUpdateService
 {
-    private const long MaxArchiveBytes = 400L * 1024 * 1024;
+    private const long MaxExecutableBytes = 512L * 1024 * 1024;
     private static readonly HttpClient Client = CreateClient();
 
     private static HttpClient CreateClient()
@@ -113,73 +112,57 @@ public static class NetShiftUpdateService
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        var root = document.RootElement;
+        return ParseLatestRelease(document.RootElement, repository, CurrentVersion);
+    }
 
+    internal static NetShiftUpdate? ParseLatestRelease(JsonElement root, string repository, string currentVersion)
+    {
         var tag = RequiredString(root, "tag_name");
         var latestVersion = ParseVersion(tag);
-        if (latestVersion <= ParseVersion(CurrentVersion)) return null;
+        if (latestVersion <= ParseVersion(currentVersion)) return null;
 
-        var archiveName = $"NetShift-{tag}-win-x64.zip";
-        var checksumName = archiveName + ".sha256";
         if (!root.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
             throw new InvalidDataException("В релизе NetShift не найден список файлов.");
 
-        JsonElement archiveAsset = default;
-        JsonElement checksumAsset = default;
+        JsonElement executableAsset = default;
         foreach (var asset in assets.EnumerateArray())
         {
             var name = RequiredString(asset, "name");
-            if (name.Equals(archiveName, StringComparison.OrdinalIgnoreCase)) archiveAsset = asset;
-            else if (name.Equals(checksumName, StringComparison.OrdinalIgnoreCase)) checksumAsset = asset;
+            if (name.Equals("NetShift.exe", StringComparison.OrdinalIgnoreCase)) executableAsset = asset;
         }
-        if (archiveAsset.ValueKind == JsonValueKind.Undefined || checksumAsset.ValueKind == JsonValueKind.Undefined)
-            throw new InvalidDataException($"В релизе {tag} не найден архив приложения или файл контрольной суммы.");
+        if (executableAsset.ValueKind == JsonValueKind.Undefined)
+            throw new InvalidDataException($"В релизе {tag} не найден файл NetShift.exe.");
 
-        var archiveUrl = ValidateReleaseAssetUrl(RequiredString(archiveAsset, "browser_download_url"), repository, tag);
-        var checksumUrl = ValidateReleaseAssetUrl(RequiredString(checksumAsset, "browser_download_url"), repository, tag);
-        var archiveSize = archiveAsset.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var size) ? size : 0;
-        if (archiveSize <= 0 || archiveSize > MaxArchiveBytes)
-            throw new InvalidDataException("Размер ZIP-архива NetShift недопустим.");
+        var executableUrl = ValidateReleaseAssetUrl(RequiredString(executableAsset, "browser_download_url"), repository, tag);
+        var executableSize = executableAsset.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var size) ? size : 0;
+        if (executableSize <= 0 || executableSize > MaxExecutableBytes)
+            throw new InvalidDataException("Размер NetShift.exe недопустим.");
 
-        string? apiSha256 = null;
-        if (archiveAsset.TryGetProperty("digest", out var digestElement) && digestElement.ValueKind == JsonValueKind.String)
-        {
-            var digestMatch = Regex.Match(digestElement.GetString() ?? string.Empty, "^sha256:([0-9a-fA-F]{64})$", RegexOptions.CultureInvariant);
-            if (digestMatch.Success) apiSha256 = digestMatch.Groups[1].Value.ToLowerInvariant();
-        }
+        var digestMatch = Regex.Match(RequiredString(executableAsset, "digest"), "^sha256:([0-9a-fA-F]{64})$", RegexOptions.CultureInvariant);
+        if (!digestMatch.Success)
+            throw new InvalidDataException("GitHub API не предоставил корректную SHA-256 для NetShift.exe.");
 
         var versionText = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag[1..] : tag;
-        return new NetShiftUpdate(tag, versionText, archiveName, archiveUrl, checksumUrl, archiveSize, apiSha256);
+        return new NetShiftUpdate(tag, versionText, "NetShift.exe", executableUrl, executableSize, digestMatch.Groups[1].Value.ToLowerInvariant());
     }
 
-    public static async Task<string> DownloadAndExtractAsync(NetShiftUpdate update, IProgress<double>? progress, CancellationToken cancellationToken)
+    public static async Task<string> DownloadExecutableAsync(NetShiftUpdate update, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var checksumText = await Client.GetStringAsync(update.ChecksumUrl, cancellationToken);
-        if (checksumText.Length > 4096)
-            throw new InvalidDataException("Файл контрольной суммы NetShift неожиданно велик.");
-        var checksumMatch = Regex.Match(checksumText.Trim(), $"^(?<hash>[0-9a-fA-F]{{64}})\\s+\\*?{Regex.Escape(update.ArchiveName)}$", RegexOptions.CultureInvariant);
-        if (!checksumMatch.Success)
-            throw new InvalidDataException("Файл контрольной суммы не соответствует ZIP-архиву NetShift.");
-        var expectedHash = checksumMatch.Groups["hash"].Value.ToLowerInvariant();
-        if (update.ApiSha256 is not null && !update.ApiSha256.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Контрольные суммы из GitHub API и файла релиза не совпадают.");
-
         var safeTag = Regex.Replace(update.Tag, "[^A-Za-z0-9._-]", "_");
         var updateDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "Updates", safeTag);
         Directory.CreateDirectory(updateDirectory);
-        var archivePath = Path.Combine(updateDirectory, update.ArchiveName);
-        var temporaryArchivePath = archivePath + ".download";
-        var stagedExecutablePath = Path.Combine(updateDirectory, "NetShift.exe");
+        var stagedExecutablePath = Path.Combine(updateDirectory, update.ExecutableName);
+        var temporaryExecutablePath = stagedExecutablePath + ".download";
 
         try
         {
-            using var response = await Client.GetAsync(update.ArchiveUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await Client.GetAsync(update.ExecutableUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
-            if (response.Content.Headers.ContentLength is long contentLength && contentLength != update.ArchiveSize)
-                throw new InvalidDataException("Размер ZIP-архива не совпадает с данными GitHub.");
+            if (response.Content.Headers.ContentLength is long contentLength && contentLength != update.ExecutableSize)
+                throw new InvalidDataException("Размер NetShift.exe не совпадает с данными GitHub.");
 
             await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var output = new FileStream(temporaryArchivePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+            await using (var output = new FileStream(temporaryExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
             {
                 var buffer = new byte[81920];
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -189,41 +172,30 @@ public static class NetShiftUpdateService
                 while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
                 {
                     total += read;
-                    if (total > MaxArchiveBytes || total > update.ArchiveSize)
-                        throw new InvalidDataException("Загруженный ZIP-архив превышает объявленный размер.");
+                    if (total > MaxExecutableBytes || total > update.ExecutableSize)
+                        throw new InvalidDataException("Загруженный NetShift.exe превышает объявленный размер.");
                     hash.AppendData(buffer, 0, read);
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                     if (Stopwatch.GetElapsedTime(lastProgressTimestamp) >= TimeSpan.FromMilliseconds(100))
                     {
                         lastProgressTimestamp = Stopwatch.GetTimestamp();
-                        progress?.Report((double)total / update.ArchiveSize);
+                        progress?.Report((double)total / update.ExecutableSize);
                     }
                 }
-                if (total != update.ArchiveSize)
-                    throw new InvalidDataException("Загруженный ZIP-архив имеет неполный размер.");
+                if (total != update.ExecutableSize)
+                    throw new InvalidDataException("Загруженный NetShift.exe имеет неполный размер.");
                 var actualHash = Convert.ToHexString(hash.GetHashAndReset());
-                if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("SHA-256 загруженного ZIP-архива NetShift не совпал.");
+                if (!actualHash.Equals(update.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("SHA-256 загруженного NetShift.exe не совпал с GitHub API.");
             }
 
-            using (var zip = ZipFile.OpenRead(temporaryArchivePath))
-            {
-                if (zip.Entries.Count != 1 || !zip.Entries[0].FullName.Equals("NetShift.exe", StringComparison.OrdinalIgnoreCase) ||
-                    zip.Entries[0].Length <= 0 || zip.Entries[0].Length > MaxArchiveBytes)
-                    throw new InvalidDataException("ZIP-архив должен содержать только NetShift.exe.");
-
-                await using var entryStream = zip.Entries[0].Open();
-                await using var executableStream = new FileStream(stagedExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                await entryStream.CopyToAsync(executableStream, cancellationToken);
-            }
-
-            File.Delete(temporaryArchivePath);
+            File.Move(temporaryExecutablePath, stagedExecutablePath, overwrite: true);
             progress?.Report(1);
             return stagedExecutablePath;
         }
         catch
         {
-            if (File.Exists(temporaryArchivePath)) File.Delete(temporaryArchivePath);
+            if (File.Exists(temporaryExecutablePath)) File.Delete(temporaryExecutablePath);
             if (File.Exists(stagedExecutablePath)) File.Delete(stagedExecutablePath);
             throw;
         }

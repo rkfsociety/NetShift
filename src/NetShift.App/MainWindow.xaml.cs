@@ -835,7 +835,7 @@ public partial class MainWindow : Window
         {
             UpdateStatusText.Text = $"Скачиваю NetShift {update.Tag}: 0%";
             var progress = new Progress<double>(value => UpdateStatusText.Text = $"Скачиваю NetShift {update.Tag}: {value:P0}");
-            var stagedExecutable = await NetShiftUpdateService.DownloadAndExtractAsync(update, progress, CancellationToken.None);
+            var stagedExecutable = await NetShiftUpdateService.DownloadExecutableAsync(update, progress, CancellationToken.None);
             if (!await StopLegacyDnsAndRestoreAsync())
                 throw new InvalidOperationException("Сначала восстановите DNS Legacy, затем повторите обновление NetShift.");
             var targetExecutable = Path.Combine(AppContext.BaseDirectory, "NetShift.exe");

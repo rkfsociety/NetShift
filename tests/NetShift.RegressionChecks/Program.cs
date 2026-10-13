@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using NetShift.App.Services;
 
 CheckBackupIsIdempotent();
@@ -10,6 +11,7 @@ CheckDnsRestore(true, false, "reset,ipv6=2001:4860::1");
 CheckDnsRestore(false, false, "reset,ipv4=1.1.1.1,ipv6=2001:4860::1");
 await CheckProcessTimeoutAsync();
 CheckUpdateConfirmation();
+CheckExecutableReleaseMetadata();
 Console.WriteLine("NetShift regression checks passed.");
 
 static void CheckBackupIsIdempotent()
@@ -129,4 +131,41 @@ static void CheckUpdateConfirmation()
         finally { File.Delete(outsideBackup); }
     }
     finally { Directory.Delete(directory, recursive: true); }
+}
+
+static void CheckExecutableReleaseMetadata()
+{
+    var digest = new string('a', 64);
+    var releaseJson = $$"""
+    {
+      "tag_name": "v0.3.036",
+      "assets": [
+        {
+          "name": "NetShift.exe",
+          "browser_download_url": "https://github.com/example/NetShift/releases/download/v0.3.036/NetShift.exe",
+          "size": 1024,
+          "digest": "sha256:{{digest}}"
+        }
+      ]
+    }
+    """;
+    using var release = JsonDocument.Parse(releaseJson);
+    var update = NetShiftUpdateService.ParseLatestRelease(release.RootElement, "example/NetShift", "0.3.035");
+    if (update is null || update.ExecutableName != "NetShift.exe" || update.ExecutableSize != 1024 || update.Sha256 != digest ||
+        update.ExecutableUrl != "https://github.com/example/NetShift/releases/download/v0.3.036/NetShift.exe")
+        throw new InvalidOperationException("The executable-only release metadata was not accepted.");
+
+    if (NetShiftUpdateService.ParseLatestRelease(release.RootElement, "example/NetShift", "0.3.036") is not null)
+        throw new InvalidOperationException("A release matching the current app version was offered as an update.");
+
+    var releaseWithoutDigest = releaseJson.Replace($"\"digest\": \"sha256:{digest}\"", "\"digest\": null", StringComparison.Ordinal);
+    using var invalidRelease = JsonDocument.Parse(releaseWithoutDigest);
+    try
+    {
+        NetShiftUpdateService.ParseLatestRelease(invalidRelease.RootElement, "example/NetShift", "0.3.035");
+        throw new InvalidOperationException("An executable release without a SHA-256 digest was accepted.");
+    }
+    catch (InvalidDataException)
+    {
+    }
 }
