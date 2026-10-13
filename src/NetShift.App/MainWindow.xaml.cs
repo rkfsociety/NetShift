@@ -1525,7 +1525,7 @@ public partial class MainWindow : Window
             if (IsCompleteZapretPackage(latestInstallPath))
             {
                 SelectZapretFolder(latestInstallPath);
-                DownloadStatusText.Text = $"Последний релиз {latestRelease.Tag} уже установлен; выбрана его папка.";
+                DownloadStatusText.Text = string.Empty;
                 if (!_settings.InitialZapretStrategyCheckCompleted)
                     await CheckZapretStrategiesAsync(isInitialCheck: true);
                 return;
@@ -1541,7 +1541,7 @@ public partial class MainWindow : Window
                     throw new InvalidDataException($"Папка {installPath} уже существует, но пакет неполный. Архив сохранён; выберите другой путь или исправьте папку.");
                 File.Delete(release.ArchivePath);
                 SelectZapretFolder(installPath);
-                DownloadStatusText.Text = $"Последний релиз {release.Tag} уже установлен; выбрана его папка.";
+                DownloadStatusText.Text = string.Empty;
                 if (!_settings.InitialZapretStrategyCheckCompleted)
                     await CheckZapretStrategiesAsync(isInitialCheck: true);
                 return;
