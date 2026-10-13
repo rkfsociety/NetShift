@@ -75,11 +75,6 @@
                     Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
             </Button>
-            <Button x:Name="AboutNavigationButton" Tag="about" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12" Margin="0,5,0,0"
-                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="О программе" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
-            </Button>
             <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,14" />
             <TextBlock Text="Системные действия подтверждаются Windows."
                        Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="2,18,2,0" />
@@ -454,40 +449,41 @@
                     BorderThickness="1" CornerRadius="18" Padding="28">
               <StackPanel>
                 <TextBlock Text="Обновления" FontSize="20" FontWeight="SemiBold" />
-                <TextBlock Text="NetShift проверяет последнюю доступную версию и обновляет установленное приложение с сохранением сетевых настроек."
-                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
-                <TextBlock Text="Проверить обновления можно в верхней части окна."
-                           Foreground="{StaticResource MutedBrush}" FontSize="13" />
+                <TextBlock Text="NetShift проверяет обновления при запуске. Установить доступную версию можно кнопкой «Проверить обновления» в верхней панели; сетевые настройки сохраняются."
+                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="18" Padding="24" Margin="0,12,0,0">
+              <StackPanel>
+                <TextBlock Text="О программе" FontSize="20" FontWeight="SemiBold" />
+                <Grid Margin="0,14,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                  <Border Width="48" Height="48" CornerRadius="12" Background="{StaticResource LogoBrush}"
+                          BorderBrush="#14B8E8" BorderThickness="1">
+                    <TextBlock Text="N" Foreground="White" FontSize="28" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <TextBlock Text="NetShift" FontSize="19" FontWeight="Bold" />
+                    <TextBlock x:Name="AboutVersionText" Text="Версия NetShift" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,3,0,0" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock Text="NetShift объединяет настройку DNS в Windows и управление zapret от Flowseal."
+                           Foreground="{StaticResource MutedBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,14,0,0" />
+                <StackPanel Margin="0,10,0,0">
+                  <TextBlock Text="DNS: выбор провайдера или собственных IPv4/IPv6-адресов, DoH и отдельная служба, работающая независимо от приложения."
+                             Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" />
+                  <TextBlock Text="zapret: загрузка официального пакета, запуск стратегий вручную или как службы, проверка доступности сайтов и диагностика."
+                             Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" />
+                  <TextBlock Text="Системные изменения Windows выполняются после подтверждения администратора."
+                             Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,10,0,0" />
+                </StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
 
-        <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
-          <StackPanel>
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="18" Padding="32">
-              <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
-                  <Border Width="58" Height="58" CornerRadius="15" Background="{StaticResource LogoBrush}"
-                          BorderBrush="#14B8E8" BorderThickness="1">
-                    <TextBlock Text="N" Foreground="White" FontSize="34" FontWeight="Bold"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  </Border>
-                  <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
-                    <TextBlock Text="NetShift" FontSize="27" FontWeight="Bold" />
-                    <TextBlock Text="Сеть под контролем" Foreground="{StaticResource MutedBrush}" FontSize="13" />
-                  </StackPanel>
-                </StackPanel>
-                <TextBlock Text="Управление DNS и zapret в одном приложении. Настройки сети применяются только после подтверждения Windows."
-                           Foreground="{StaticResource MutedBrush}" FontSize="15" TextWrapping="Wrap" />
-                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,24,0,18" />
-                <TextBlock x:Name="AboutVersionText" Text="Версия NetShift" FontSize="15" FontWeight="SemiBold" />
-                <TextBlock Text="NetShift · Windows" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,5,0,0" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
       </Grid>
     </Grid>
   </Grid>

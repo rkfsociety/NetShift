@@ -102,25 +102,22 @@ public partial class MainWindow : Window
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
         ZapretPage.Visibility = page == "zapret" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
-        AboutPage.Visibility = page == "about" ? Visibility.Visible : Visibility.Collapsed;
         PageTitleText.Text = page switch
         {
             "zapret" => "zapret",
             "settings" => "Настройки",
-            "about" => "О программе",
             _ => "DNS"
         };
 
         SetNavigationButtonState(DnsNavigationButton, page == "dns");
         SetNavigationButtonState(ZapretNavigationButton, page == "zapret");
         SetNavigationButtonState(SettingsNavigationButton, page == "settings");
-        SetNavigationButtonState(AboutNavigationButton, page == "about");
         if (page == "zapret") _ = RefreshServiceStatusAsync();
     }
 
     private void SetNavigationButtonState(System.Windows.Controls.Button button, bool isSelected)
     {
-        var transparentIdle = button == SettingsNavigationButton || button == AboutNavigationButton;
+        var transparentIdle = button == SettingsNavigationButton;
         button.Background = (System.Windows.Media.Brush)FindResource(isSelected
             ? "NavSelectedBrush"
             : transparentIdle ? "SidebarBrush" : "PanelBrush");
