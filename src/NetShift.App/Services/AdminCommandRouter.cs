@@ -247,15 +247,12 @@ public static class AdminCommandRouter
 
         var startInfo = new ProcessStartInfo("cmd.exe")
         {
+            Arguments = $"/c \"{scriptPath}\"",
             WorkingDirectory = Path.GetDirectoryName(scriptPath)!,
             UseShellExecute = false,
             CreateNoWindow = true
         };
         startInfo.Environment["NO_UPDATE_CHECK"] = "1";
-        startInfo.ArgumentList.Add("/d");
-        startInfo.ArgumentList.Add("/s");
-        startInfo.ArgumentList.Add("/c");
-        startInfo.ArgumentList.Add($"\"\"{scriptPath}\"\"");
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить командный файл.");
         for (var attempt = 0; attempt < 100; attempt++)
         {
@@ -635,6 +632,7 @@ public static class AdminCommandRouter
         var targets = ZapretConnectivityTester.LoadTargets(folder);
         var testedCount = 0;
         var candidates = new List<(string Path, ZapretConnectivitySummary Summary)>();
+        var failures = new List<string>();
         var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, [], 0, 0, 0, 0,
             $"Подготовка проверки {strategies.Length} стратегий по {targets.Count} целям.");
         WriteZapretTestProgress(progressPath, progress);
@@ -681,8 +679,12 @@ public static class AdminCommandRouter
                     $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.");
             }
             else
+            {
+                var failureMessage = string.IsNullOrWhiteSpace(failure) ? "причина не указана" : failure;
+                failures.Add($"{strategyName}: {failureMessage}");
                 progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length, [], 0, 0, 0, 0,
                     $"Не удалось проверить {strategyName}. {failure}");
+            }
             WriteZapretTestProgress(progressPath, progress);
         }
 
@@ -697,8 +699,8 @@ public static class AdminCommandRouter
             bestSummary?.Groups ?? [], bestSummary?.HttpPassed ?? 0, bestSummary?.HttpTotal ?? 0,
             bestSummary?.PingPassed ?? 0, bestSummary?.PingTotal ?? 0,
             recommendedPath is null
-                ? $"Не удалось запустить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}."
-                : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}.",
+                ? $"Не удалось проверить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}. {failures.FirstOrDefault()}"
+                : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}.",
             recommendedPath,
             Completed: true);
         WriteZapretTestProgress(progressPath, progress);
@@ -709,15 +711,12 @@ public static class AdminCommandRouter
         var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
         var startInfo = new ProcessStartInfo("cmd.exe")
         {
+            Arguments = $"/c \"{strategyPath}\"",
             WorkingDirectory = folder,
             UseShellExecute = false,
             CreateNoWindow = true
         };
         startInfo.Environment["NO_UPDATE_CHECK"] = "1";
-        startInfo.ArgumentList.Add("/d");
-        startInfo.ArgumentList.Add("/s");
-        startInfo.ArgumentList.Add("/c");
-        startInfo.ArgumentList.Add($"\"\"{strategyPath}\"\"");
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить выбранный .bat.");
 
         for (var attempt = 0; attempt < 25; attempt++)
