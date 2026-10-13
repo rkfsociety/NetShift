@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using NetShift.App.Models;
 using NetShift.App.Services;
 using Microsoft.Win32;
@@ -51,10 +52,16 @@ public partial class MainWindow : Window
     private bool _isBasicConnectionActionRunning;
     private bool _isSyncingBasicSelectors;
     private string? _lastZapretTestProgressJson;
+    private BitmapSource? _powerButtonOff;
+    private BitmapSource? _powerButtonOn;
 
     public MainWindow()
     {
         InitializeComponent();
+        var buttonSprite = new BitmapImage(new Uri("pack://application:,,,/NetShift;component/Assets/BasicPowerButtons.png"));
+        _powerButtonOff = new CroppedBitmap(buttonSprite, new Int32Rect(0, 0, 1024, 1024));
+        _powerButtonOn = new CroppedBitmap(buttonSprite, new Int32Rect(1024, 0, 1024, 1024));
+        BasicPowerButtonFace.Source = _powerButtonOff;
         AboutVersionText.Text = $"Версия NetShift {NetShiftUpdateService.CurrentVersion}";
         _trayIcon = CreateTrayIcon();
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
@@ -239,13 +246,10 @@ public partial class MainWindow : Window
             : selectionMatches || anyActive && !hasSelection ? "ВЫКЛЮЧИТЬ"
             : anyActive ? "ПЕРЕПОДКЛЮЧИТЬ"
             : "ВКЛЮЧИТЬ";
-        BasicConnectionButtonIcon.Text = "\uE7E8";
-        BasicConnectionButton.Background = selectionMatches
-            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(25, 135, 94))
-            : anyActive
-                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 72, 103))
-                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 72, 103));
-        BasicConnectionButton.Foreground = System.Windows.Media.Brushes.White;
+        BasicPowerButtonFace.Source = anyActive ? _powerButtonOn : _powerButtonOff;
+        BasicPowerHalo.Fill = anyActive
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(55, 0, 200, 255))
+            : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 119, 148, 173));
         var busy = _isBasicConnectionActionRunning || _isZapretStrategyTestRunning || _isZapretServiceActionRunning;
         BasicConnectionButton.IsEnabled = (hasSelection || anyActive) && !busy;
 
