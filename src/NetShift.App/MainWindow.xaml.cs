@@ -104,7 +104,10 @@ public partial class MainWindow : Window
         ConfigureVpnAdaptersCheckBox.IsChecked = _settings.ConfigureVpnAdapters;
         AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
         UpdateAppAutoStartStatus();
-        NavigateToPage("basic");
+        var initialPage = _settings.LastSelectedPage is "basic" or "dns" or "zapret" or "settings"
+            ? _settings.LastSelectedPage
+            : "basic";
+        NavigateToPage(initialPage, persistSelection: false);
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         _ = RefreshDnsServiceStatusAsync();
         RefreshAdapters(selectFirst: true);
@@ -122,8 +125,11 @@ public partial class MainWindow : Window
         NavigateToPage(BasicPage.Visibility == Visibility.Visible ? "dns" : "basic");
     }
 
-    private void NavigateToPage(string page)
+    private void NavigateToPage(string page, bool persistSelection = true)
     {
+        if (page is not ("basic" or "dns" or "zapret" or "settings"))
+            page = "dns";
+
         BasicPage.Visibility = page == "basic" ? Visibility.Visible : Visibility.Collapsed;
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
         ZapretPage.Visibility = page == "zapret" ? Visibility.Visible : Visibility.Collapsed;
@@ -146,6 +152,12 @@ public partial class MainWindow : Window
         {
             UpdateBasicModeStatus();
             if (IsLoaded) _ = RefreshServiceStatusAsync();
+        }
+
+        if (persistSelection && !string.Equals(_settings.LastSelectedPage, page, StringComparison.Ordinal))
+        {
+            _settings.LastSelectedPage = page;
+            SaveSettings();
         }
     }
 
@@ -2339,6 +2351,7 @@ public partial class MainWindow : Window
         public bool BasicZapretUseService { get; set; } = true;
         public bool BasicZapretAutoStrategy { get; set; } = true;
         public string? BasicZapretStrategyPath { get; set; }
+        public string LastSelectedPage { get; set; } = "basic";
     }
 
     private sealed record PackageChoice(string Name, string Value)
