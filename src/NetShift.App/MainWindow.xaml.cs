@@ -1437,6 +1437,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TogglePackageSettings_Click(object sender, RoutedEventArgs e)
+    {
+        var isExpanded = PackageSettingsPanel.Visibility != Visibility.Visible;
+        PackageSettingsPanel.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        PackageSettingsToggleButton.Content = isExpanded ? "Дополнительные настройки ▲" : "Дополнительные настройки ▼";
+    }
+
     private async void SavePackageSettings_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetZapretFolder(out var folder)) return;
