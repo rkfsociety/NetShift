@@ -12,5 +12,6 @@
     <Compile Include="..\..\src\NetShift.App\Services\ZapretConnectivityTester.cs" Link="ZapretConnectivityTester.cs" />
     <Compile Include="..\..\src\NetShift.App\Models\DnsProvider.cs" Link="DnsProvider.cs" />
     <Compile Include="..\..\src\NetShift.App\Models\ZapretTestProgress.cs" Link="ZapretTestProgress.cs" />
+    <Compile Include="..\..\src\NetShift.App\Models\ZapretStrategyHealth.cs" Link="ZapretStrategyHealth.cs" />
   </ItemGroup>
 </Project>

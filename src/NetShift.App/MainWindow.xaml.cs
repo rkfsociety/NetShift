@@ -354,10 +354,16 @@ public partial class MainWindow : Window
         StrategyComboBox.ItemsSource = strategies.Select(path =>
         {
             var fullPath = Path.GetFullPath(path);
-            var hasHealth = _settings.ZapretStrategyHealth.TryGetValue(HealthKey(fullPath), out var isHealthy);
+            var healthKey = HealthKey(fullPath);
+            _settings.ZapretStrategyHealth.TryGetValue(healthKey, out var legacyHealthy);
+            _settings.ZapretStrategyStatuses.TryGetValue(healthKey, out var savedStatus);
+            var healthStatus = ZapretStrategyHealthRules.FromStoredStatus(savedStatus, legacyHealthy);
             var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
-            return new StrategyItem(Path.GetFileName(path), fullPath, hasHealth ? isHealthy : null, isRecommended);
-        }).ToArray();
+            return new StrategyItem(Path.GetFileName(path), fullPath, healthStatus, isRecommended);
+        })
+            .OrderBy(item => ZapretStrategyHealthRules.SortOrder(item.HealthStatus))
+            .ThenBy(item => item.Path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
+            .ToArray();
         StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
         StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
         return strategies;
@@ -1259,6 +1265,7 @@ public partial class MainWindow : Window
         }
 
         _settings.ZapretStrategyHealth.Clear();
+        _settings.ZapretStrategyStatuses.Clear();
         _settings.RecommendedZapretStrategyPath = null;
         SaveSettings();
         UpdateZapretInventory();
@@ -1277,10 +1284,12 @@ public partial class MainWindow : Window
             ZapretConnectivityTester.EnsureCurlAvailable();
             var targets = ZapretConnectivityTester.LoadTargets(Path.GetDirectoryName(activeStrategyPath)!);
             var result = await ZapretConnectivityTester.CheckTargetsAsync(targets);
-            var healthy = result.HttpTotal > 0 && result.HttpPassed == result.HttpTotal && result.PingPassed == result.PingTotal;
+            var healthStatus = ZapretStrategyHealthRules.FromResults(result.HttpPassed, result.HttpTotal, result.PingPassed, result.PingTotal);
+            var healthy = healthStatus == ZapretStrategyHealthStatus.Green;
             SetZapretTargetStatuses(result.Groups);
             _settings.ZapretStrategyHealth.Clear();
-            _settings.ZapretStrategyHealth[HealthKey(activeStrategyPath)] = healthy;
+            _settings.ZapretStrategyStatuses.Clear();
+            SaveStrategyHealth(activeStrategyPath, healthStatus);
             _settings.RecommendedZapretStrategyPath = Path.GetFullPath(activeStrategyPath);
             if (isInitialCheck) _settings.InitialZapretStrategyCheckCompleted = true;
             SaveSettings();
@@ -1319,7 +1328,12 @@ public partial class MainWindow : Window
             .ToArray();
         if (strategyPaths.Length == 0) return;
 
-        foreach (var strategyPath in strategyPaths) _settings.ZapretStrategyHealth.Remove(HealthKey(strategyPath));
+        foreach (var strategyPath in strategyPaths)
+        {
+            var healthKey = HealthKey(strategyPath);
+            _settings.ZapretStrategyHealth.Remove(healthKey);
+            _settings.ZapretStrategyStatuses.Remove(healthKey);
+        }
         _settings.RecommendedZapretStrategyPath = null;
         SaveSettings();
         UpdateZapretInventory();
@@ -1457,9 +1471,10 @@ public partial class MainWindow : Window
         var healthChanged = false;
         if (progress.StrategyPath is not null && (progress.Phase is "failed" or "scored"))
         {
-            var healthy = progress.Phase == "scored" && progress.HttpTotal > 0 &&
-                progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal;
-            _settings.ZapretStrategyHealth[HealthKey(progress.StrategyPath)] = healthy;
+            var healthStatus = progress.Phase == "scored"
+                ? ZapretStrategyHealthRules.FromResults(progress.HttpPassed, progress.HttpTotal, progress.PingPassed, progress.PingTotal)
+                : ZapretStrategyHealthStatus.Red;
+            SaveStrategyHealth(progress.StrategyPath, healthStatus);
             healthChanged = true;
         }
         if (_settings.RecommendedZapretStrategyPath != progress.RecommendedPath)
@@ -1513,6 +1528,13 @@ public partial class MainWindow : Window
     }
 
     private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
+
+    private void SaveStrategyHealth(string path, ZapretStrategyHealthStatus status)
+    {
+        var healthKey = HealthKey(path);
+        _settings.ZapretStrategyStatuses[healthKey] = status.ToString();
+        _settings.ZapretStrategyHealth[healthKey] = status == ZapretStrategyHealthStatus.Green;
+    }
 
     private void ToggleZapretAdvanced_Click(object sender, RoutedEventArgs e)
     {
@@ -1868,6 +1890,7 @@ public partial class MainWindow : Window
         public bool CheckZapretUpdatesBeforeStart { get; set; }
         public bool InitialZapretStrategyCheckCompleted { get; set; }
         public Dictionary<string, bool> ZapretStrategyHealth { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> ZapretStrategyStatuses { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string? RecommendedZapretStrategyPath { get; set; }
         public bool NativeDnsMode { get; set; } = true;
         public bool SupportIPv6 { get; set; } = true;
@@ -1879,11 +1902,23 @@ public partial class MainWindow : Window
     {
         public override string ToString() => Name;
     }
-    private sealed record StrategyItem(string Name, string Path, bool? IsHealthy, bool IsRecommended)
+    private sealed record StrategyItem(string Name, string Path, ZapretStrategyHealthStatus HealthStatus, bool IsRecommended)
     {
-        public Visibility HealthVisibility => IsHealthy.HasValue ? Visibility.Visible : Visibility.Collapsed;
-        public System.Windows.Media.Brush HealthBrush => IsRecommended || IsHealthy == true ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
-        public string HealthTooltip => IsRecommended ? "Лучшая стратегия по числу успешных HTTP/TLS проверок и ping" : IsHealthy == true ? "Все проверки пройдены" : "Есть неуспешные HTTP/TLS проверки или ping";
+        public Visibility HealthVisibility => HealthStatus == ZapretStrategyHealthStatus.Unknown ? Visibility.Collapsed : Visibility.Visible;
+        public System.Windows.Media.Brush HealthBrush => HealthStatus switch
+        {
+            ZapretStrategyHealthStatus.Green => System.Windows.Media.Brushes.LightGreen,
+            ZapretStrategyHealthStatus.Yellow => System.Windows.Media.Brushes.Goldenrod,
+            ZapretStrategyHealthStatus.Red => System.Windows.Media.Brushes.IndianRed,
+            _ => System.Windows.Media.Brushes.Gray
+        };
+        public string HealthTooltip => HealthStatus switch
+        {
+            ZapretStrategyHealthStatus.Green => "Все HTTP/TLS проверки и ping пройдены",
+            ZapretStrategyHealthStatus.Yellow => "Часть проверок прошла",
+            ZapretStrategyHealthStatus.Red => "Ни одна проверка не прошла",
+            _ => "Стратегия ещё не проверялась"
+        } + (IsRecommended ? ". Лучшая по числу успешных проверок" : string.Empty);
         public override string ToString() => Name;
     }
 }

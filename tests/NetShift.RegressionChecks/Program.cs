@@ -6,6 +6,7 @@ using NetShift.App.Services;
 
 CheckDnsProviderAddressEditing();
 CheckZapretTargetParsing();
+CheckZapretStrategyHealth();
 CheckZapretCurlModesAndRanking();
 CheckBackupIsIdempotent();
 CheckBackupSurvivesMissingAdapter();
@@ -60,6 +61,22 @@ static void CheckZapretTargetParsing()
         throw new InvalidOperationException("The zapret tester fallback targets no longer match test zapret.ps1.");
     if (ZapretConnectivityTester.CountProbeOperations(defaults) != 53)
         throw new InvalidOperationException("The zapret progress count does not match the fallback targets.");
+}
+
+static void CheckZapretStrategyHealth()
+{
+    if (ZapretStrategyHealthRules.FromResults(8, 8, 4, 4) != ZapretStrategyHealthStatus.Green ||
+        ZapretStrategyHealthRules.FromResults(7, 8, 4, 4) != ZapretStrategyHealthStatus.Yellow ||
+        ZapretStrategyHealthRules.FromResults(0, 8, 0, 4) != ZapretStrategyHealthStatus.Red ||
+        ZapretStrategyHealthRules.FromResults(0, 0, 2, 2) != ZapretStrategyHealthStatus.Green)
+        throw new InvalidOperationException("Zapret strategy health must distinguish full, partial, and failed probe results.");
+
+    if (ZapretStrategyHealthRules.FromStoredStatus(null, false) != ZapretStrategyHealthStatus.Yellow ||
+        ZapretStrategyHealthRules.FromStoredStatus("Red", true) != ZapretStrategyHealthStatus.Red ||
+        ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Green) >= ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Yellow) ||
+        ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Yellow) >= ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Red) ||
+        ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Red) >= ZapretStrategyHealthRules.SortOrder(ZapretStrategyHealthStatus.Unknown))
+        throw new InvalidOperationException("Zapret strategy health migration or display ordering is incorrect.");
 }
 
 static void CheckZapretCurlModesAndRanking()
