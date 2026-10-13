@@ -59,8 +59,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         var buttonSprite = new BitmapImage(new Uri("pack://application:,,,/NetShift;component/Assets/BasicPowerButtons.png"));
-        _powerButtonOff = new CroppedBitmap(buttonSprite, new Int32Rect(0, 0, 1024, 1024));
-        _powerButtonOn = new CroppedBitmap(buttonSprite, new Int32Rect(1024, 0, 1024, 1024));
+        _powerButtonOff = new CroppedBitmap(buttonSprite, new Int32Rect(325, 90, 600, 600));
+        _powerButtonOn = new CroppedBitmap(buttonSprite, new Int32Rect(1050, 90, 600, 600));
         BasicPowerButtonFace.Source = _powerButtonOff;
         AboutVersionText.Text = $"Версия NetShift {NetShiftUpdateService.CurrentVersion}";
         _trayIcon = CreateTrayIcon();

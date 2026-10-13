@@ -40,7 +40,7 @@ public static class NetShiftUpdateService
             if (versionMatch.Success) return versionMatch.Groups["version"].Value;
 
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version?.ToString(3) ?? "0.3.070";
+            return version?.ToString(3) ?? "0.3.071";
         }
     }
 
