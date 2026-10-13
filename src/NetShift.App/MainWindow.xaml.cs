@@ -131,6 +131,13 @@ public partial class MainWindow : Window
             page = "dns";
 
         var isBasicMode = page == "basic";
+        var targetWidth = isBasicMode ? 760d : 1120d;
+        if (Width != targetWidth)
+        {
+            if (IsLoaded && WindowState == WindowState.Normal)
+                Left -= (targetWidth - Width) / 2;
+            Width = targetWidth;
+        }
         SidebarPanel.Visibility = isBasicMode ? Visibility.Collapsed : Visibility.Visible;
         SidebarColumn.Width = isBasicMode ? new GridLength(0) : new GridLength(272);
 
@@ -2362,7 +2369,10 @@ public partial class MainWindow : Window
     {
         public override string ToString() => Name;
     }
-    private sealed record BasicStrategyChoice(string Name, string? Path, bool IsAutomatic);
+    private sealed record BasicStrategyChoice(string Name, string? Path, bool IsAutomatic)
+    {
+        public override string ToString() => Name;
+    }
     private sealed record StrategyItem(string Name, string Path, ZapretStrategyHealthStatus HealthStatus, bool IsRecommended)
     {
         public Visibility HealthVisibility => HealthStatus == ZapretStrategyHealthStatus.Unknown ? Visibility.Collapsed : Visibility.Visible;
