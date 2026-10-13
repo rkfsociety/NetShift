@@ -8,6 +8,7 @@ CheckDnsProviderAddressEditing();
 CheckZapretTargetParsing();
 CheckZapretStrategyHealth();
 CheckZapretCurlModesAndRanking();
+CheckZapretStrategyRankingPersistence();
 CheckBackupIsIdempotent();
 CheckBackupSurvivesMissingAdapter();
 CheckDnsRestore(true, true, "reset");
@@ -112,6 +113,26 @@ static void CheckZapretCurlModesAndRanking()
     if (summary.HttpPassed != 1 || summary.HttpTotal != 3 || summary.PingPassed != 1 || summary.PingTotal != 1 ||
         summary.Groups["Discord"].HttpPassed != 1)
         throw new InvalidOperationException("Zapret test scoring no longer counts curl exit success and ping results like the original tester.");
+}
+
+static void CheckZapretStrategyRankingPersistence()
+{
+    var ordered = ZapretStrategyRanking.Order(
+    [
+        new ZapretStrategyRanking(@"C:\zapret\general3.bat", 35, 36, 17, 17),
+        new ZapretStrategyRanking(@"C:\zapret\general10.bat", 36, 36, 0, 17),
+        new ZapretStrategyRanking(@"C:\zapret\general2.bat", 35, 36, 17, 17)
+    ]);
+    if (Path.GetFileName(ordered[0].Path) != "general10.bat" ||
+        Path.GetFileName(ordered[1].Path) != "general2.bat" ||
+        Path.GetFileName(ordered[2].Path) != "general3.bat")
+        throw new InvalidOperationException("Saved zapret strategies must retain HTTP-first, ping-second, natural-path ranking.");
+
+    var serialized = JsonSerializer.Serialize(ordered);
+    var restored = JsonSerializer.Deserialize<List<ZapretStrategyRanking>>(serialized);
+    if (restored is null || restored.Count != ordered.Count ||
+        restored[0].HttpPassed != 36 || restored[1].PingPassed != 17)
+        throw new InvalidOperationException("Zapret strategy ranking did not survive settings serialization.");
 }
 
 static void CheckBackupIsIdempotent()

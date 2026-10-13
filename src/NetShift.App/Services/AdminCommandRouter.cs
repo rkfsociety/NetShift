@@ -743,12 +743,22 @@ public static class AdminCommandRouter
         if (Process.Start(startInfo) is null) throw new InvalidOperationException("Не удалось запустить официальный тестовый скрипт.");
     }
 
-    private static string? RunZapretStrategyTestSweep(string folder, string progressPath)
+    private static string? RunZapretStrategyTestSweep(
+        string folder,
+        string progressPath,
+        IReadOnlyList<string>? requestedStrategies = null,
+        bool candidateOnly = false)
     {
-        var strategies = Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
+        var fullFolder = Path.GetFullPath(folder);
+        var strategies = requestedStrategies?.ToArray() ?? Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
             .OrderBy(path => path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
             .ToArray();
         if (strategies.Length == 0) throw new InvalidOperationException("В выбранной папке не найдены стратегии general*.bat.");
+        if (strategies.Any(path => !Path.GetDirectoryName(Path.GetFullPath(path))!.Equals(fullFolder, StringComparison.OrdinalIgnoreCase) ||
+                                   !Path.GetFileName(path).StartsWith("general", StringComparison.OrdinalIgnoreCase) ||
+                                   !Path.GetFileName(path).EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+                                   !File.Exists(path)))
+            throw new InvalidOperationException("Для проверки выбрана стратегия вне пакета zapret.");
 
         ZapretConnectivityTester.EnsureCurlAvailable();
         EnsureZapretCanBeTested();
@@ -842,7 +852,9 @@ public static class AdminCommandRouter
             bestSummary?.PingPassed ?? 0, bestSummary?.PingTotal ?? 0,
             recommendedPath is null
                 ? $"Не удалось проверить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}. {failures.FirstOrDefault()}"
-                : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}.",
+                : candidateOnly
+                    ? $"Дополнительная проверка {Path.GetFileNameWithoutExtension(recommendedPath)} завершена: HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}."
+                    : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}.",
             recommendedPath,
             Completed: true,
             CompletedProbeCount: completedProbeCount,
@@ -894,14 +906,17 @@ public static class AdminCommandRouter
         try
         {
             StopManualZapretProcesses(folder);
-            var bestPath = RunZapretStrategyTestSweep(folder, progressPath);
+            var isSavedAutoCandidate = strategyMode.Equals("auto-ranked", StringComparison.OrdinalIgnoreCase);
+            var bestPath = isSavedAutoCandidate
+                ? RunZapretStrategyTestSweep(folder, progressPath, [Path.GetFullPath(requestedStrategyPath)], candidateOnly: true)
+                : RunZapretStrategyTestSweep(folder, progressPath);
             if (string.IsNullOrWhiteSpace(bestPath))
                 throw new InvalidOperationException("Не удалось проверить ни одну стратегию zapret.");
 
-            var selectedPath = strategyMode.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            var selectedPath = strategyMode.Equals("auto", StringComparison.OrdinalIgnoreCase) || isSavedAutoCandidate
                 ? bestPath
                 : Path.GetFullPath(requestedStrategyPath);
-            if (!Path.GetDirectoryName(selectedPath)!.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
+            if (!Path.GetDirectoryName(selectedPath)!.Equals(Path.GetFullPath(folder), StringComparison.OrdinalIgnoreCase) ||
                 !Path.GetFileName(selectedPath).StartsWith("general", StringComparison.OrdinalIgnoreCase) ||
                 !File.Exists(selectedPath))
                 throw new InvalidOperationException("Выбранная стратегия не принадлежит установленному пакету zapret.");

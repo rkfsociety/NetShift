@@ -52,6 +52,9 @@ public partial class MainWindow : Window
     private bool _isBasicConnectionActionRunning;
     private bool _isSyncingBasicSelectors;
     private string? _lastZapretTestProgressJson;
+    private readonly List<ZapretStrategyRanking> _currentZapretStrategyRankings = [];
+    private bool _isZapretRankedCandidateCheck;
+    private string? _rankedCandidatePath;
     private BitmapSource? _powerButtonOff;
     private BitmapSource? _powerButtonOn;
     private bool _powerHaloAnimating;
@@ -447,6 +450,7 @@ public partial class MainWindow : Window
         {
             if (File.Exists(_settingsPath))
                 _settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_settingsPath)) ?? new AppSettings();
+            _settings.ZapretStrategyRankings ??= [];
         }
         catch
         {
@@ -549,6 +553,11 @@ public partial class MainWindow : Window
             : [];
 
         var selectedPath = StrategyComboBox.SelectedValue as string;
+        var rankingOrder = _settings.ZapretStrategyRankings
+            .Select((ranking, index) => (ranking, index))
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.ranking.Path))
+            .GroupBy(entry => entry.ranking.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Min(entry => entry.index), StringComparer.OrdinalIgnoreCase);
         var items = strategies.Select(path =>
         {
             var fullPath = Path.GetFullPath(path);
@@ -559,12 +568,12 @@ public partial class MainWindow : Window
             var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
             return new StrategyItem(Path.GetFileName(path), fullPath, healthStatus, isRecommended);
         })
-            .OrderBy(item => ZapretStrategyHealthRules.SortOrder(item.HealthStatus))
+            .OrderBy(item => rankingOrder.TryGetValue(item.Path, out var rank) ? rank : int.MaxValue)
             .ThenBy(item => item.Path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
             .ToArray();
         StrategyComboBox.ItemsSource = items;
         StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
-        StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
+        StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? items.FirstOrDefault()?.Path;
         RefreshBasicStrategyChoices(items);
         return strategies;
     }
@@ -573,7 +582,7 @@ public partial class MainWindow : Window
     {
         var choices = new List<BasicStrategyChoice>
         {
-            new("Автовыбор — лучшая после проверки", null, true)
+            new("Автовыбор — лучшая по сохранённому рейтингу", null, true)
         };
         choices.AddRange(strategies.Select(item => new BasicStrategyChoice(item.Name, item.Path, false)));
 
@@ -1435,10 +1444,15 @@ public partial class MainWindow : Window
 
     private async Task<bool> ConnectBasicZapretAsync(string folder)
     {
-        var requestedStrategyPath = _settings.BasicZapretAutoStrategy ? string.Empty : _settings.BasicZapretStrategyPath ?? string.Empty;
+        var savedBestStrategyPath = _settings.BasicZapretAutoStrategy ? GetBestSavedZapretStrategy(folder) : null;
+        var requestedStrategyPath = _settings.BasicZapretAutoStrategy
+            ? savedBestStrategyPath ?? string.Empty
+            : _settings.BasicZapretStrategyPath ?? string.Empty;
         var runtimeMode = _settings.BasicZapretUseService ? "службой Windows" : "фоновым процессом без службы";
         var prompt = _settings.BasicZapretAutoStrategy
-            ? $"Проверить весь список стратегий zapret, выбрать лучшую и запустить её {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора."
+            ? savedBestStrategyPath is null
+                ? $"Проверить список стратегий zapret, сохранить рейтинг и запустить лучшую {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора."
+                : $"Дополнительно проверить лучшую сохранённую стратегию {Path.GetFileName(savedBestStrategyPath)} и запустить её {runtimeMode}? Windows запросит подтверждение администратора."
             : $"Проверить весь список стратегий, затем запустить выбранную {Path.GetFileName(requestedStrategyPath)} {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора.";
         if (ThemedDialog.Show(this, prompt, "Подключить zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             return false;
@@ -1803,7 +1817,13 @@ public partial class MainWindow : Window
             .ToArray();
         if (strategyPaths.Length == 0) return false;
 
-        foreach (var strategyPath in strategyPaths)
+        _isZapretRankedCandidateCheck = startAfterCheck && _settings.BasicZapretAutoStrategy && !string.IsNullOrWhiteSpace(requestedStrategyPath);
+        _rankedCandidatePath = _isZapretRankedCandidateCheck ? Path.GetFullPath(requestedStrategyPath!) : null;
+        _currentZapretStrategyRankings.Clear();
+
+        foreach (var strategyPath in strategyPaths.Where(path =>
+                     !_isZapretRankedCandidateCheck ||
+                     string.Equals(Path.GetFullPath(path), _rankedCandidatePath, StringComparison.OrdinalIgnoreCase)))
         {
             var healthKey = HealthKey(strategyPath);
             _settings.ZapretStrategyHealth.Remove(healthKey);
@@ -1829,7 +1849,9 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Text = "Подготовка";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
         ZapretTestStrategyText.Text = startAfterCheck
-            ? $"Оригинальные general*.bat проверяются по очереди; затем стратегия запустится {(useService ? "как служба Windows" : "в фоне без службы")} ."
+            ? _isZapretRankedCandidateCheck
+                ? $"Лидер сохранённого рейтинга проверяется; затем запускается {(useService ? "как служба Windows" : "в фоне без службы")} ."
+                : $"Оригинальные general*.bat проверяются по очереди; затем стратегия запустится {(useService ? "как служба Windows" : "в фоне без службы")} ."
             : "Оригинальные general*.bat запускаются по очереди и останавливаются после проверки. Служба Windows не меняется.";
         ZapretTestStrategyText.Visibility = Visibility.Collapsed;
         ZapretTestProgressBar.IsIndeterminate = false;
@@ -1843,7 +1865,7 @@ public partial class MainWindow : Window
         {
             var testTask = startAfterCheck
                 ? RunElevatedWorkerAsync("zapret-autoconnect", folder, progressPath,
-                    _settings.BasicZapretAutoStrategy ? "auto" : "manual",
+                    _isZapretRankedCandidateCheck ? "auto-ranked" : _settings.BasicZapretAutoStrategy ? "auto" : "manual",
                     requestedStrategyPath ?? string.Empty,
                     useService ? "service" : "manual")
                 : RunElevatedWorkerAsync("zapret-test-strategies", folder, progressPath);
@@ -1855,6 +1877,7 @@ public partial class MainWindow : Window
 
             if (!await testTask)
             {
+                await ApplyZapretTestProgressAsync(progressPath);
                 ZapretHealthStatusText.Text = "Проверка отменена или не завершилась.";
                 ZapretTestPhaseText.Text = "Проверка не завершена";
                 ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.IndianRed;
@@ -1889,6 +1912,8 @@ public partial class MainWindow : Window
         finally
         {
             _isZapretStrategyTestRunning = false;
+            _isZapretRankedCandidateCheck = false;
+            _rankedCandidatePath = null;
             ZapretTestStrategyText.Visibility = Visibility.Visible;
             ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             UpdateZapretInventory();
@@ -1971,6 +1996,12 @@ public partial class MainWindow : Window
                 : ZapretStrategyHealthStatus.Red;
             SaveStrategyHealth(progress.StrategyPath, healthStatus);
             healthChanged = true;
+            if (progress.Phase == "scored")
+            {
+                _currentZapretStrategyRankings.Add(new ZapretStrategyRanking(
+                    Path.GetFullPath(progress.StrategyPath), progress.HttpPassed, progress.HttpTotal,
+                    progress.PingPassed, progress.PingTotal));
+            }
         }
         if (_settings.RecommendedZapretStrategyPath != progress.RecommendedPath)
         {
@@ -1979,6 +2010,22 @@ public partial class MainWindow : Window
         }
         if (healthChanged)
         {
+            SaveSettings();
+            RefreshStrategyItems();
+        }
+        if (progress.Completed)
+        {
+            if (_isZapretRankedCandidateCheck)
+            {
+                _settings.ZapretStrategyRankings.RemoveAll(ranking =>
+                    string.Equals(ranking.Path, _rankedCandidatePath, StringComparison.OrdinalIgnoreCase));
+                _settings.ZapretStrategyRankings.AddRange(_currentZapretStrategyRankings);
+                _settings.ZapretStrategyRankings = ZapretStrategyRanking.Order(_settings.ZapretStrategyRankings).ToList();
+            }
+            else
+            {
+                _settings.ZapretStrategyRankings = ZapretStrategyRanking.Order(_currentZapretStrategyRankings).ToList();
+            }
             SaveSettings();
             RefreshStrategyItems();
         }
@@ -2023,6 +2070,20 @@ public partial class MainWindow : Window
     }
 
     private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
+
+    private string? GetBestSavedZapretStrategy(string folder)
+    {
+        var fullFolder = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        foreach (var ranking in ZapretStrategyRanking.Order(_settings.ZapretStrategyRankings))
+        {
+            if (string.IsNullOrWhiteSpace(ranking.Path) || !File.Exists(ranking.Path) ||
+                !Path.GetDirectoryName(Path.GetFullPath(ranking.Path))!.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Equals(fullFolder, StringComparison.OrdinalIgnoreCase))
+                continue;
+            return Path.GetFullPath(ranking.Path);
+        }
+        return null;
+    }
 
     private void SaveStrategyHealth(string path, ZapretStrategyHealthStatus status)
     {
@@ -2386,6 +2447,7 @@ public partial class MainWindow : Window
         public bool InitialZapretStrategyCheckCompleted { get; set; }
         public Dictionary<string, bool> ZapretStrategyHealth { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> ZapretStrategyStatuses { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<ZapretStrategyRanking> ZapretStrategyRankings { get; set; } = [];
         public string? RecommendedZapretStrategyPath { get; set; }
         public bool NativeDnsMode { get; set; } = true;
         public bool SupportIPv6 { get; set; } = true;

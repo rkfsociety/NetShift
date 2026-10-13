@@ -13,5 +13,7 @@
     <Compile Include="..\..\src\NetShift.App\Models\DnsProvider.cs" Link="DnsProvider.cs" />
     <Compile Include="..\..\src\NetShift.App\Models\ZapretTestProgress.cs" Link="ZapretTestProgress.cs" />
     <Compile Include="..\..\src\NetShift.App\Models\ZapretStrategyHealth.cs" Link="ZapretStrategyHealth.cs" />
+    <Compile Include="..\..\src\NetShift.App\Models\ZapretStrategyRanking.cs" Link="ZapretStrategyRanking.cs" />
+    <Compile Include="..\..\src\NetShift.App\Services\ZapretStrategyComparer.cs" Link="ZapretStrategyComparer.cs" />
   </ItemGroup>
 </Project>
