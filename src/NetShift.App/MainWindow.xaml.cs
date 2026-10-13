@@ -1437,11 +1437,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void TogglePackageSettings_Click(object sender, RoutedEventArgs e)
+    private void ToggleZapretAdvanced_Click(object sender, RoutedEventArgs e)
     {
         var isExpanded = PackageSettingsPanel.Visibility != Visibility.Visible;
-        PackageSettingsPanel.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
-        PackageSettingsToggleButton.Content = isExpanded ? "Дополнительные настройки ▲" : "Дополнительные настройки ▼";
+        var visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        PackageSettingsPanel.Visibility = visibility;
+        ToolsAndDiagnosticsPanel.Visibility = visibility;
+        ZapretAdvancedToggleButton.Content = isExpanded
+            ? "Дополнительные настройки и диагностика ▲"
+            : "Дополнительные настройки и диагностика ▼";
     }
 
     private async void SavePackageSettings_Click(object sender, RoutedEventArgs e)
