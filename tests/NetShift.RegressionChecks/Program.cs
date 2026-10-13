@@ -49,6 +49,8 @@ static void CheckZapretTargetParsing()
     var parsed = ZapretConnectivityTester.ParseTargets(targetsFile);
     if (parsed.Count != 16 || parsed.Count(target => target.Url is not null) != 12 || parsed.Count(target => target.Url is null) != 4)
         throw new InvalidOperationException("The zapret tester did not load the targets.txt URL and ping-only entries.");
+    if (ZapretConnectivityTester.CountProbeOperations(parsed) != 52)
+        throw new InvalidOperationException("The zapret progress count must include three curl probes per URL and one ping per ping target.");
     if (parsed.Count(target => target.Group == "Discord") != 4 || parsed.Count(target => target.Group == "YouTube") != 4 ||
         parsed.Count(target => target.Group == "Google") != 4 || parsed.Count(target => target.Group == "Cloudflare") != 4)
         throw new InvalidOperationException("The zapret target groups no longer match the official list.");
@@ -56,6 +58,8 @@ static void CheckZapretTargetParsing()
     var defaults = ZapretConnectivityTester.ParseTargets(string.Empty);
     if (defaults.Count != 17 || defaults.Count(target => target.Url is not null) != 12 || defaults.Count(target => target.Url is null) != 5)
         throw new InvalidOperationException("The zapret tester fallback targets no longer match test zapret.ps1.");
+    if (ZapretConnectivityTester.CountProbeOperations(defaults) != 53)
+        throw new InvalidOperationException("The zapret progress count does not match the fallback targets.");
 }
 
 static void CheckZapretCurlModesAndRanking()

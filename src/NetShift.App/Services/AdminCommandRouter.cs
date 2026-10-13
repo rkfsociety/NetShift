@@ -630,11 +630,16 @@ public static class AdminCommandRouter
         ZapretConnectivityTester.EnsureCurlAvailable();
         EnsureZapretCanBeTested();
         var targets = ZapretConnectivityTester.LoadTargets(folder);
+        var completedProbeCount = 0;
+        var totalProbeCount = ZapretConnectivityTester.CountProbeOperations(targets) * strategies.Length;
+        var progressWriteLock = new object();
         var testedCount = 0;
         var candidates = new List<(string Path, ZapretConnectivitySummary Summary)>();
         var failures = new List<string>();
         var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, [], 0, 0, 0, 0,
-            $"Подготовка проверки {strategies.Length} стратегий по {targets.Count} целям.");
+            "Подготовка проверки.",
+            CompletedProbeCount: completedProbeCount,
+            TotalProbeCount: totalProbeCount);
         WriteZapretTestProgress(progressPath, progress);
 
         foreach (var strategyPath in strategies)
@@ -645,15 +650,25 @@ public static class AdminCommandRouter
             ZapretConnectivitySummary? summary = null;
             string? failure = null;
             progress = new ZapretTestProgress(strategyPath, "starting", testedCount + 1, strategies.Length, [], 0, 0, 0, 0,
-                $"Запускаю временно {strategyName}.");
+                $"Запускаю временно {strategyName}.",
+                CompletedProbeCount: completedProbeCount,
+                TotalProbeCount: totalProbeCount);
             WriteZapretTestProgress(progressPath, progress);
 
             try
             {
                 batchProcess = StartZapretTestBatch(strategyPath, folder);
-                progress = progress with { Phase = "checking", Message = $"Проверяю {targets.Count} целей через {strategyName}: HTTP/1.1, TLS 1.2, TLS 1.3 и ping…" };
+                progress = progress with { Phase = "checking", Message = "Проверяю соединение." };
                 WriteZapretTestProgress(progressPath, progress);
-                summary = ZapretConnectivityTester.CheckTargetsAsync(targets).GetAwaiter().GetResult();
+                summary = ZapretConnectivityTester.CheckTargetsAsync(targets, probeCompleted: () =>
+                {
+                    lock (progressWriteLock)
+                    {
+                        completedProbeCount++;
+                        progress = progress with { CompletedProbeCount = completedProbeCount };
+                        WriteZapretTestProgress(progressPath, progress);
+                    }
+                }).GetAwaiter().GetResult();
             }
             catch (Exception error)
             {
@@ -676,14 +691,18 @@ public static class AdminCommandRouter
                 candidates.Add((Path.GetFullPath(strategyPath), summary));
                 progress = new ZapretTestProgress(strategyPath, "scored", testedCount, strategies.Length,
                     summary.Groups, summary.HttpPassed, summary.HttpTotal, summary.PingPassed, summary.PingTotal,
-                    $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.");
+                    $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
+                    CompletedProbeCount: completedProbeCount,
+                    TotalProbeCount: totalProbeCount);
             }
             else
             {
                 var failureMessage = string.IsNullOrWhiteSpace(failure) ? "причина не указана" : failure;
                 failures.Add($"{strategyName}: {failureMessage}");
                 progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length, [], 0, 0, 0, 0,
-                    $"Не удалось проверить {strategyName}. {failure}");
+                    $"Не удалось проверить {strategyName}. {failure}",
+                    CompletedProbeCount: completedProbeCount,
+                    TotalProbeCount: totalProbeCount);
             }
             WriteZapretTestProgress(progressPath, progress);
         }
@@ -702,7 +721,9 @@ public static class AdminCommandRouter
                 ? $"Не удалось проверить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}. {failures.FirstOrDefault()}"
                 : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}.",
             recommendedPath,
-            Completed: true);
+            Completed: true,
+            CompletedProbeCount: completedProbeCount,
+            TotalProbeCount: totalProbeCount);
         WriteZapretTestProgress(progressPath, progress);
     }
 

@@ -1269,6 +1269,7 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Text = "Проверка выполняется";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
         ZapretTestStrategyText.Text = $"Активная служба: {displayStrategyName}. Тестирую HTTP/1.1, TLS 1.2, TLS 1.3 и ping; службу не прерываю.";
+        ZapretTestProgressBar.IsIndeterminate = true;
         ZapretTestProgressBar.Visibility = Visibility.Visible;
         ResetZapretTargetStatuses("Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
         try
@@ -1305,6 +1306,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            ZapretTestProgressBar.IsIndeterminate = false;
             ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             CheckActiveStrategyButton.IsEnabled = !_isZapretStrategyTestRunning && Directory.Exists(ZapretFolderTextBox.Text.Trim());
         }
@@ -1333,11 +1335,16 @@ public partial class MainWindow : Window
         ZapretServiceToggle.IsEnabled = false;
         ServiceRunButton.IsEnabled = false;
         ApplyServiceStrategyButton.IsEnabled = false;
-        ZapretHealthStatusText.Text = $"Проверяю все стратегии: 0 из {strategyPaths.Length}.";
+        ZapretHealthStatusText.Text = "Подготовка проверки…";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Подготовка";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
         ZapretTestStrategyText.Text = "Оригинальные general*.bat запускаются по очереди и останавливаются после проверки. Служба Windows не меняется.";
+        ZapretTestStrategyText.Visibility = Visibility.Collapsed;
+        ZapretTestProgressBar.IsIndeterminate = false;
+        ZapretTestProgressBar.Minimum = 0;
+        ZapretTestProgressBar.Maximum = 1;
+        ZapretTestProgressBar.Value = 0;
         ZapretTestProgressBar.Visibility = Visibility.Visible;
         ResetZapretTargetStatuses("Ожидает", System.Windows.Media.Brushes.Gray);
 
@@ -1383,6 +1390,7 @@ public partial class MainWindow : Window
         finally
         {
             _isZapretStrategyTestRunning = false;
+            ZapretTestStrategyText.Visibility = Visibility.Visible;
             ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             UpdateZapretInventory();
             try { File.Delete(progressPath); } catch { }
@@ -1407,7 +1415,7 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Text = progress.Phase switch
         {
             "starting" => "Запуск стратегии",
-            "checking" => "HTTP/TLS и ping",
+            "checking" => "Проверка",
             "failed" => "Не прошла",
             "scored" => "Результат получен",
             "completed" => progress.RecommendedPath is null ? "Подходящая не найдена" : "Проверка завершена",
@@ -1415,16 +1423,19 @@ public partial class MainWindow : Window
         };
         ZapretTestPhaseText.Foreground = progress.Phase switch
         {
-            "checking" or "starting" => System.Windows.Media.Brushes.DodgerBlue,
+            "checking" or "starting" or "scored" => System.Windows.Media.Brushes.DodgerBlue,
             "failed" => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
             "completed" => System.Windows.Media.Brushes.Goldenrod,
             _ => (System.Windows.Media.Brush)FindResource("MutedBrush")
         };
-        ZapretHealthStatusText.Text = progress.Message;
+        ZapretHealthStatusText.Text = progress.TotalProbeCount > 0 && (progress.Phase is "checking" or "scored")
+            ? $"Проверяю {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
+            : progress.Message;
         ZapretHealthStatusText.Foreground = progress.Phase switch
         {
+            "checking" or "starting" or "scored" => System.Windows.Media.Brushes.DodgerBlue,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
             "completed" => System.Windows.Media.Brushes.Goldenrod,
@@ -1434,6 +1445,10 @@ public partial class MainWindow : Window
         ZapretTestStrategyText.Text = progress.StrategyPath is null
             ? $"Проверено {progress.StrategyIndex} из {progress.StrategyCount}. Служба Windows не меняется."
             : $"{Path.GetFileNameWithoutExtension(progress.StrategyPath)} · вариант {progress.StrategyIndex} из {progress.StrategyCount}.";
+        ZapretTestStrategyText.Visibility = progress.Completed ? Visibility.Visible : Visibility.Collapsed;
+        ZapretTestProgressBar.Minimum = 0;
+        ZapretTestProgressBar.Maximum = Math.Max(1, progress.TotalProbeCount);
+        ZapretTestProgressBar.Value = Math.Clamp(progress.CompletedProbeCount, 0, Math.Max(1, progress.TotalProbeCount));
         ZapretTestProgressBar.Visibility = progress.Completed ? Visibility.Collapsed : Visibility.Visible;
 
         var pendingStatus = progress.Phase == "checking" ? "Проверяется…" : progress.Phase == "failed" ? "Не проверено" : "Ожидает";

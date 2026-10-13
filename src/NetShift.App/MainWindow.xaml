@@ -345,7 +345,7 @@
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
                 <TextBlock x:Name="ZapretTestStrategyText" Text="Сверка по targets.txt: три curl пробы и ping для каждой цели. Автоперебор запускает оригинальные general*.bat; подготовка может включить TCP timestamps. Активную службу тестирую без остановки."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8" />
-                <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
+                <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="False" Visibility="Collapsed" Margin="0,0,0,8" />
                 <UniformGrid Columns="3">
                   <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,6,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

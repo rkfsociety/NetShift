@@ -99,16 +99,20 @@ internal static class ZapretConnectivityTester
         ];
     }
 
+    internal static int CountProbeOperations(IReadOnlyList<ZapretConnectivityTarget> targets) =>
+        targets.Sum(target => (target.Url is null ? 0 : Modes.Length) + (target.PingTarget is null ? 0 : 1));
+
     internal static async Task<ZapretConnectivitySummary> CheckTargetsAsync(
         IReadOnlyList<ZapretConnectivityTarget> targets,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action? probeCompleted = null)
     {
         var maxParallel = Math.Min(16, Math.Max(8, Environment.ProcessorCount * 2));
         using var semaphore = new SemaphoreSlim(maxParallel, maxParallel);
         var tasks = targets.Select(async target =>
         {
             await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try { return await CheckTargetAsync(target, cancellationToken).ConfigureAwait(false); }
+            try { return await CheckTargetAsync(target, cancellationToken, probeCompleted).ConfigureAwait(false); }
             finally { semaphore.Release(); }
         });
 
@@ -171,7 +175,8 @@ internal static class ZapretConnectivityTester
 
     private static async Task<ZapretConnectivityTargetResult> CheckTargetAsync(
         ZapretConnectivityTarget target,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? probeCompleted)
     {
         var probes = new List<ZapretCurlProbeResult>(Modes.Length);
         if (target.Url is not null)
@@ -179,12 +184,16 @@ internal static class ZapretConnectivityTester
             foreach (var mode in Modes)
             {
                 probes.Add(await ProbeUrlAsync(target.Url, mode.Label, cancellationToken).ConfigureAwait(false));
+                probeCompleted?.Invoke();
             }
         }
 
-        var ping = target.PingTarget is null
-            ? new ZapretPingResult(false, null)
-            : await ProbePingAsync(target.PingTarget, cancellationToken).ConfigureAwait(false);
+        var ping = new ZapretPingResult(false, null);
+        if (target.PingTarget is not null)
+        {
+            ping = await ProbePingAsync(target.PingTarget, cancellationToken).ConfigureAwait(false);
+            probeCompleted?.Invoke();
+        }
         return new ZapretConnectivityTargetResult(target, probes, ping.Succeeded, ping.RoundtripMilliseconds);
     }
 
