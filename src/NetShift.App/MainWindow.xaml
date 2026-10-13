@@ -96,8 +96,13 @@
                   </StackPanel>
                 </Grid>
                 <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="10,6" MinHeight="36" Margin="0,9,0,0" />
-                <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
-                        Padding="10,6" MinHeight="38" Margin="0,7,0,0" />
+                <Grid x:Name="UpdateActionsGrid" Margin="0,7,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
+                          Grid.ColumnSpan="2" Padding="8,6" MinHeight="38" ToolTip="Проверить наличие обновлений NetShift" />
+                  <Button x:Name="InstallUpdateButton" Grid.Column="1" Content="Установить" Click="InstallUpdateButton_Click"
+                          Visibility="Collapsed" Padding="8,6" MinHeight="38" Margin="6,0,0,0" />
+                </Grid>
                 <Button x:Name="InstallDnsServiceButton" Content="Установить службу DNS" Click="InstallDnsService_Click"
                         Visibility="Collapsed" Padding="10,5" MinHeight="34" Margin="0,7,0,0" />
                 <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click"

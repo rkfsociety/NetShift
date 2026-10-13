@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using NetShift.App.Models;
 using NetShift.App.Services;
@@ -767,17 +768,26 @@ public partial class MainWindow : Window
 
     private async void RefreshDnsServiceStatus_Click(object sender, RoutedEventArgs e) => await RefreshDnsServiceStatusAsync();
 
-    private async Task CheckNetShiftUpdatesAsync(bool showError)
+    private async Task<NetShiftUpdate?> CheckNetShiftUpdatesAsync(bool showError)
     {
         if (NetShiftUpdateService.Repository is null)
         {
             UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion}";
             UpdateButton.Content = "Обновление в релизной сборке";
             UpdateButton.IsEnabled = false;
-            return;
+            UpdateButton.ToolTip = null;
+            Grid.SetColumnSpan(UpdateButton, 2);
+            InstallUpdateButton.Visibility = Visibility.Collapsed;
+            _availableUpdate = null;
+            return null;
         }
 
         UpdateButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
+        Grid.SetColumnSpan(UpdateButton, 2);
+        UpdateButton.Content = "Проверка…";
+        _availableUpdate = null;
         UpdateStatusText.Text = "Проверяю последнюю версию NetShift…";
         try
         {
@@ -786,41 +796,52 @@ public partial class MainWindow : Window
             {
                 UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion}";
                 UpdateButton.Content = "Проверить обновления";
+                UpdateButton.ToolTip = "Проверить наличие обновлений NetShift";
             }
             else
             {
-                UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion} · доступно обновление {_availableUpdate.Version}";
-                UpdateButton.Content = $"Скачать и установить {_availableUpdate.Tag}";
+                UpdateStatusText.Text = $"Доступна версия {_availableUpdate.Version}";
+                UpdateButton.Content = "Проверить";
+                UpdateButton.ToolTip = "Повторно проверить последнюю версию NetShift";
+                Grid.SetColumnSpan(UpdateButton, 1);
+                InstallUpdateButton.Content = "Установить";
+                InstallUpdateButton.ToolTip = $"Скачать и установить NetShift {_availableUpdate.Version}";
+                InstallUpdateButton.Visibility = Visibility.Visible;
             }
+            return _availableUpdate;
         }
         catch (Exception error)
         {
+            _availableUpdate = null;
             UpdateStatusText.Text = "Не удалось проверить обновления NetShift";
             UpdateButton.Content = "Повторить проверку";
+            UpdateButton.ToolTip = "Повторить проверку наличия обновлений NetShift";
             if (showError)
                 ThemedDialog.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
         }
         finally
         {
             UpdateButton.IsEnabled = true;
+            InstallUpdateButton.IsEnabled = _availableUpdate is not null;
         }
     }
 
-    private async void UpdateButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_availableUpdate is null)
-        {
-            await CheckNetShiftUpdatesAsync(showError: true);
-            return;
-        }
+    private async void UpdateButton_Click(object sender, RoutedEventArgs e) =>
+        await CheckNetShiftUpdatesAsync(showError: true);
 
-        var update = _availableUpdate;
+    private async void InstallUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        var update = await CheckNetShiftUpdatesAsync(showError: true);
+        if (update is null) return;
+
         if (ThemedDialog.Show(this,
                 $"Скачать и установить NetShift {update.Tag}? Приложение закроется и автоматически запустится после обновления.",
                 "Обновление NetShift", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             return;
 
         UpdateButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
         try
         {
             UpdateStatusText.Text = $"Скачиваю NetShift {update.Tag}: 0%";
@@ -837,8 +858,12 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             UpdateStatusText.Text = "Установка обновления не завершена";
-            UpdateButton.IsEnabled = true;
             ThemedDialog.Show(this, error.Message, "Обновление NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            UpdateButton.IsEnabled = NetShiftUpdateService.Repository is not null;
+            InstallUpdateButton.IsEnabled = _availableUpdate is not null;
         }
     }
 
