@@ -404,9 +404,17 @@ public partial class MainWindow : Window
         var ipSetMode = "any";
         if (File.Exists(ipSetPath))
         {
-            var lines = File.ReadAllLines(ipSetPath).Select(line => line.Trim()).Where(line => line.Length > 0).ToArray();
-            if (lines.Length > 0)
-                ipSetMode = lines.Any(line => line.Contains("203.0.113.113/32", StringComparison.Ordinal)) ? "none" : "loaded";
+            foreach (var line in File.ReadLines(ipSetPath))
+            {
+                var trimmedLine = line.Trim();
+                if (trimmedLine.Length == 0) continue;
+                if (trimmedLine.Contains("203.0.113.113/32", StringComparison.Ordinal))
+                {
+                    ipSetMode = "none";
+                    break;
+                }
+                ipSetMode = "loaded";
+            }
         }
         IpSetModeComboBox.SelectedValue = ipSetMode;
         AutoUpdateCheckBox.IsChecked = _settings.CheckZapretUpdatesBeforeStart;
@@ -607,9 +615,8 @@ public partial class MainWindow : Window
             await RefreshDnsServiceStatusAsync();
         }
 
-        await Task.WhenAll(
-            RefreshDnsAiProviderAsync(showError: false),
-            CheckNetShiftUpdatesAsync(showError: false));
+        var dnsAiRefresh = RefreshDnsAiProviderAsync(showError: false);
+        var updateCheck = CheckNetShiftUpdatesAsync(showError: false);
 
         if (!_settings.InitialZapretStrategyCheckCompleted)
         {
@@ -623,6 +630,8 @@ public partial class MainWindow : Window
                 ZapretTestStrategyText.Text = "Проверка запускается до установки стратегии и не требует работающей службы.";
             }
         }
+
+        await Task.WhenAll(dnsAiRefresh, updateCheck);
     }
 
     private void AppAutoStart_Click(object sender, RoutedEventArgs e)
