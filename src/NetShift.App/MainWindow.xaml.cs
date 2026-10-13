@@ -1695,7 +1695,10 @@ public partial class MainWindow : Window
         public string? DnsProviderName { get; set; }
     }
 
-    private sealed record PackageChoice(string Name, string Value);
+    private sealed record PackageChoice(string Name, string Value)
+    {
+        public override string ToString() => Name;
+    }
     private sealed record StrategyItem(string Name, string Path, bool? IsHealthy, bool IsRecommended)
     {
         public Visibility HealthVisibility => IsHealthy.HasValue ? Visibility.Visible : Visibility.Collapsed;
