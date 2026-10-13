@@ -246,86 +246,131 @@
               </StackPanel>
             </Border>
 
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="26">
-              <StackPanel>
-                <TextBlock Text="Запуск и служба Windows" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="Выберите стратегию для запуска или службы Windows."
-                           Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,4,0,14" />
-                <ComboBox x:Name="StrategyComboBox">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding Name}" />
-                        <Ellipse Width="8" Height="8" Fill="{Binding HealthBrush}" Visibility="{Binding HealthVisibility}"
-                                 Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{Binding HealthTooltip}">
-                          <Ellipse.Style>
-                            <Style TargetType="Ellipse">
-                              <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsRecommended}" Value="True">
-                                  <DataTrigger.EnterActions>
-                                    <BeginStoryboard x:Name="RecommendedStrategyPulse">
-                                      <Storyboard AutoReverse="True" RepeatBehavior="Forever">
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.35" To="1" Duration="0:0:0.8" />
-                                      </Storyboard>
-                                    </BeginStoryboard>
-                                  </DataTrigger.EnterActions>
-                                  <DataTrigger.ExitActions>
-                                    <StopStoryboard BeginStoryboardName="RecommendedStrategyPulse" />
-                                  </DataTrigger.ExitActions>
-                                </DataTrigger>
-                              </Style.Triggers>
-                            </Style>
-                          </Ellipse.Style>
-                        </Ellipse>
-                      </StackPanel>
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <WrapPanel Margin="0,16,0,0">
-                  <Button x:Name="StartStrategyButton" Content="Запустить стратегию" Background="{StaticResource AccentBrush}" Foreground="#07151A"
-                          BorderBrush="{StaticResource AccentBrush}" Click="StartStrategy_Click" />
-                  <Button x:Name="StopStrategyButton" Content="Остановить ручной запуск" Click="StopStrategy_Click" Margin="8,0,0,0" />
-                  <Button x:Name="InstallServiceButton" Content="Установить службу" Click="InstallService_Click" Margin="8,0,0,0" />
-                  <Button x:Name="StartServiceButton" Content="Запустить службу" Click="StartService_Click" Margin="8,0,0,0" />
-                  <Button x:Name="StopServiceButton" Content="Остановить службу" Click="StopService_Click" Margin="8,0,0,0" />
-                  <Button x:Name="RemoveServiceButton" Content="Удалить службу" Click="RemoveService_Click" Margin="8,0,0,0" />
-                  <Button Content="Обновить статус" Click="RefreshServiceStatus_Click" Margin="8,0,0,0" />
-                </WrapPanel>
-                <TextBlock x:Name="ServiceStatusText" Text="Служба zapret: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,12,0,0" />
-                <TextBlock x:Name="ManualStrategyStatusText" Text="Ручной запуск стратегии: статус не проверен" Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,5,0,0" />
-                <Button x:Name="CheckActiveStrategyButton" Content="Проверить стратегии" Click="CheckActiveStrategy_Click" HorizontalAlignment="Left" Margin="0,10,0,0" />
-                <TextBlock x:Name="ZapretHealthStatusText" Text="Проверка стратегий ещё не выполнялась." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="1,10,0,0" />
-                <Border Background="#0D1929" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,10,0,0">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                      <TextBlock Text="Проверка доступности сайтов" FontWeight="SemiBold" />
-                      <TextBlock x:Name="ZapretTestPhaseText" Grid.Column="1" Text="Ожидает проверки" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
-                    </Grid>
-                    <TextBlock x:Name="ZapretTestStrategyText" Text="При остановленной службе стратегии проверяются по очереди; первая с доступом ко всем сайтам будет рекомендована. Работающую службу NetShift не прерывает." Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,8" />
-                    <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
-                    <UniformGrid Columns="3">
-                      <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,6,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                          <Ellipse x:Name="DiscordTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                          <StackPanel><TextBlock Text="Discord" FontWeight="SemiBold"/><TextBlock x:Name="DiscordTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
-                        </StackPanel>
-                      </Border>
-                      <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="3,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                          <Ellipse x:Name="YouTubeTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                          <StackPanel><TextBlock Text="YouTube" FontWeight="SemiBold"/><TextBlock x:Name="YouTubeTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
-                        </StackPanel>
-                      </Border>
-                      <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="6,0,0,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                          <Ellipse x:Name="GoogleTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                          <StackPanel><TextBlock Text="Google" FontWeight="SemiBold"/><TextBlock x:Name="GoogleTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
-                        </StackPanel>
-                      </Border>
-                    </UniformGrid>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="18">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="1.1*" />
+                  <ColumnDefinition Width="28" />
+                  <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Text="Стратегия запуска" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
                   </StackPanel>
-                </Border>
+                  <ComboBox x:Name="StrategyComboBox" Margin="0,10,0,0">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Name}" />
+                          <Ellipse Width="8" Height="8" Fill="{Binding HealthBrush}" Visibility="{Binding HealthVisibility}"
+                                   Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{Binding HealthTooltip}">
+                            <Ellipse.Style>
+                              <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding IsRecommended}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                      <BeginStoryboard x:Name="RecommendedStrategyPulse">
+                                        <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                                          <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.35" To="1" Duration="0:0:0.8" />
+                                        </Storyboard>
+                                      </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                      <StopStoryboard BeginStoryboardName="RecommendedStrategyPulse" />
+                                    </DataTrigger.ExitActions>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Ellipse.Style>
+                          </Ellipse>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <WrapPanel Margin="0,10,0,0">
+                    <Button x:Name="StartStrategyButton" Content="Запустить стратегию" Background="{StaticResource AccentBrush}" Foreground="#07151A"
+                            BorderBrush="{StaticResource AccentBrush}" Click="StartStrategy_Click" Padding="12,8" MinHeight="38" />
+                    <Button x:Name="StopStrategyButton" Content="Остановить вручную" Click="StopStrategy_Click" Margin="8,0,0,0" Padding="12,8" MinHeight="38" />
+                  </WrapPanel>
+                  <TextBlock x:Name="ManualStrategyStatusText" Text="Ручной запуск не активен" Foreground="{StaticResource MutedBrush}"
+                             FontSize="12" TextWrapping="Wrap" Margin="1,8,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Width="1" Height="112" Background="{StaticResource BorderBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}"
+                          BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,8">
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                      <TextBlock Text="Служба zapret" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <CheckBox x:Name="ZapretServiceToggle" Grid.Column="1" Style="{StaticResource CardSwitchStyle}"
+                                Click="ZapretServiceToggle_Click" ToolTip="Установить или удалить службу zapret"
+                                AutomationProperties.Name="Служба zapret" />
+                      <TextBlock x:Name="ServiceStatusText" Grid.Row="1" Text="Статус не проверен" Foreground="{StaticResource MutedBrush}"
+                                 FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                      <WrapPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                        <Button x:Name="ServiceRunButton" Content="Запустить службу" Click="ToggleServiceRun_Click"
+                                Padding="10,6" MinHeight="34" Visibility="Collapsed" />
+                        <Button x:Name="ApplyServiceStrategyButton" Content="Применить стратегию" Click="InstallService_Click"
+                                Margin="6,0,0,0" Padding="10,6" MinHeight="34" Visibility="Collapsed" />
+                      </WrapPanel>
+                    </Grid>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}"
+                          BorderThickness="1" CornerRadius="12" Padding="12">
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="Автозапуск с Windows" FontWeight="SemiBold" />
+                        <TextBlock x:Name="AppAutoStartStatusText" Text="Отключён" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" />
+                      </StackPanel>
+                      <CheckBox x:Name="AppAutoStartCheckBox" Grid.Column="1" Style="{StaticResource CardSwitchStyle}"
+                                Click="AppAutoStart_Click" ToolTip="Запускать NetShift при входе в Windows. DNS-служба продолжит работать независимо от приложения."
+                                AutomationProperties.Name="Автозапуск NetShift с Windows" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="16" Padding="16" Margin="0,12,0,0">
+              <StackPanel>
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <TextBlock Text="Проверка стратегий" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ZapretTestPhaseText" Grid.Column="1" Text="Ожидает проверки" Foreground="{StaticResource MutedBrush}"
+                             FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <Button x:Name="CheckActiveStrategyButton" Grid.Column="2" Content="Проверить" Click="CheckActiveStrategy_Click"
+                          Padding="12,7" MinHeight="36" />
+                </Grid>
+                <TextBlock x:Name="ZapretHealthStatusText" Text="Проверка стратегий ещё не выполнялась." Foreground="{StaticResource MutedBrush}"
+                           FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <TextBlock x:Name="ZapretTestStrategyText" Text="Первая стратегия с доступом ко всем сайтам будет рекомендована. Работающую службу NetShift проверка не прерывает."
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8" />
+                <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
+                <UniformGrid Columns="3">
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="DiscordTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="Discord" FontWeight="SemiBold"/><TextBlock x:Name="DiscordTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="3,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="YouTubeTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="YouTube" FontWeight="SemiBold"/><TextBlock x:Name="YouTubeTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="6,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="GoogleTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="Google" FontWeight="SemiBold"/><TextBlock x:Name="GoogleTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                </UniformGrid>
               </StackPanel>
             </Border>
 
@@ -408,19 +453,6 @@
 
         <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="18" Padding="28" Margin="0,0,0,16">
-              <StackPanel>
-                <TextBlock Text="Запуск приложения" FontSize="20" FontWeight="SemiBold" />
-                <TextBlock Text="Настройте, как NetShift запускается вместе с Windows. Служба DNS продолжит работать независимо от приложения."
-                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,18" />
-                <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1" CornerRadius="12" Padding="16,14">
-                  <CheckBox x:Name="AppAutoStartCheckBox" Content="Запускать NetShift вместе с Windows"
-                            Click="AppAutoStart_Click" FontSize="15" VerticalAlignment="Center" />
-                </Border>
-              </StackPanel>
-            </Border>
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1" CornerRadius="18" Padding="28">
               <StackPanel>

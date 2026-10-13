@@ -39,6 +39,10 @@ public partial class MainWindow : Window
     private bool _trayNoticeShown;
     private bool _trayIconDisposed;
     private bool _isZapretStrategyTestRunning;
+    private bool _isZapretServiceInstalled;
+    private bool _isZapretServiceRunning;
+    private bool _isZapretServiceTransitioning;
+    private bool _isZapretServiceActionRunning;
     private string? _lastZapretTestProgressJson;
 
     public MainWindow()
@@ -85,6 +89,7 @@ public partial class MainWindow : Window
         SupportIPv6CheckBox.IsChecked = _settings.SupportIPv6;
         ConfigureVpnAdaptersCheckBox.IsChecked = _settings.ConfigureVpnAdapters;
         AppAutoStartCheckBox.IsChecked = IsAppAutoStartEnabled();
+        UpdateAppAutoStartStatus();
         InstallDnsServiceButton.IsEnabled = NetShiftBootstrapper.HasEmbeddedDnsService();
         _ = RefreshDnsServiceStatusAsync();
         RefreshAdapters(selectFirst: true);
@@ -110,6 +115,7 @@ public partial class MainWindow : Window
         SetNavigationButtonState(ZapretNavigationButton, page == "zapret");
         SetNavigationButtonState(SettingsNavigationButton, page == "settings");
         SetNavigationButtonState(AboutNavigationButton, page == "about");
+        if (page == "zapret") _ = RefreshServiceStatusAsync();
     }
 
     private void SetNavigationButtonState(System.Windows.Controls.Button button, bool isSelected)
@@ -312,8 +318,9 @@ public partial class MainWindow : Window
             : "В этой папке не найдены service.bat и general*.bat.");
         StartStrategyButton.IsEnabled = valid && StrategyComboBox.SelectedItem is not null && !_isZapretStrategyTestRunning;
         StopStrategyButton.IsEnabled = valid && !_isZapretStrategyTestRunning;
-        InstallServiceButton.IsEnabled = valid && StrategyComboBox.SelectedItem is not null && !_isZapretStrategyTestRunning;
-        RemoveServiceButton.IsEnabled = valid && !_isZapretStrategyTestRunning;
+        ZapretServiceToggle.IsEnabled = valid && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
+        ServiceRunButton.IsEnabled = valid && _isZapretServiceInstalled && !_isZapretServiceTransitioning && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
+        ApplyServiceStrategyButton.IsEnabled = valid && _isZapretServiceInstalled && StrategyComboBox.SelectedItem is not null && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
         GameFilterModeComboBox.IsEnabled = valid && !_isZapretStrategyTestRunning;
         GameFilterTcpTextBox.IsEnabled = valid && !_isZapretStrategyTestRunning;
         GameFilterUdpTextBox.IsEnabled = valid && !_isZapretStrategyTestRunning;
@@ -441,12 +448,20 @@ public partial class MainWindow : Window
         if (ServiceStatusText is null) return;
         RefreshManualStrategyStatus();
         var output = await QueryWindowsServiceAsync("zapret");
+        var hasPackage = Directory.Exists(ZapretFolderTextBox.Text.Trim());
         if (output is null)
         {
-            ServiceStatusText.Text = "Служба zapret: не установлена";
-            StartServiceButton.IsEnabled = false;
-            StopServiceButton.IsEnabled = false;
-            RemoveServiceButton.IsEnabled = false;
+            _isZapretServiceInstalled = false;
+            _isZapretServiceRunning = false;
+            _isZapretServiceTransitioning = false;
+            ZapretServiceToggle.IsChecked = false;
+            ZapretServiceToggle.IsEnabled = hasPackage && File.Exists(Path.Combine(ZapretFolderTextBox.Text.Trim(), "service.bat")) &&
+                StrategyComboBox.SelectedItem is StrategyItem && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
+            ServiceStatusText.Text = "Не установлена";
+            ServiceStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+            ServiceStatusText.ToolTip = null;
+            ServiceRunButton.Visibility = Visibility.Collapsed;
+            ApplyServiceStrategyButton.Visibility = Visibility.Collapsed;
             return;
         }
         var state = output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ? "работает"
@@ -454,6 +469,11 @@ public partial class MainWindow : Window
             : output.Contains("START_PENDING", StringComparison.OrdinalIgnoreCase) ? "запускается"
             : output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase) ? "остановлена"
             : "установлена";
+        _isZapretServiceInstalled = true;
+        _isZapretServiceRunning = state == "работает";
+        _isZapretServiceTransitioning = state is "останавливается" or "запускается";
+        ZapretServiceToggle.IsChecked = true;
+        ZapretServiceToggle.IsEnabled = hasPackage && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
         var strategy = string.Empty;
         var serviceFolder = string.Empty;
         try
@@ -468,20 +488,18 @@ public partial class MainWindow : Window
             }
         }
         catch { }
-        ServiceStatusText.Text = $"Служба zapret: {state}{(string.IsNullOrWhiteSpace(strategy) ? string.Empty : $" · стратегия {strategy}")}{(string.IsNullOrWhiteSpace(serviceFolder) ? string.Empty : $" · {serviceFolder}")}";
-        var packageSelected = Directory.Exists(ZapretFolderTextBox.Text.Trim());
-        StartServiceButton.IsEnabled = packageSelected && state == "остановлена";
-        StopServiceButton.IsEnabled = packageSelected && state == "работает";
-        RemoveServiceButton.IsEnabled = packageSelected;
-        if (_isZapretStrategyTestRunning)
-        {
-            StartStrategyButton.IsEnabled = false;
-            StopStrategyButton.IsEnabled = false;
-            InstallServiceButton.IsEnabled = false;
-            StartServiceButton.IsEnabled = false;
-            StopServiceButton.IsEnabled = false;
-            RemoveServiceButton.IsEnabled = false;
-        }
+        ServiceStatusText.Text = $"{char.ToUpperInvariant(state[0])}{state[1..]}{(string.IsNullOrWhiteSpace(strategy) ? string.Empty : $" · {strategy}")}";
+        ServiceStatusText.ToolTip = string.IsNullOrWhiteSpace(serviceFolder) ? null : serviceFolder;
+        ServiceStatusText.Foreground = _isZapretServiceRunning
+            ? System.Windows.Media.Brushes.LightGreen
+            : _isZapretServiceTransitioning
+                ? System.Windows.Media.Brushes.Goldenrod
+                : (System.Windows.Media.Brush)FindResource("MutedBrush");
+        ServiceRunButton.Content = _isZapretServiceRunning ? "Остановить" : _isZapretServiceTransitioning ? "Выполняется…" : "Запустить";
+        ServiceRunButton.Visibility = Visibility.Visible;
+        ServiceRunButton.IsEnabled = hasPackage && !_isZapretServiceTransitioning && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
+        ApplyServiceStrategyButton.Visibility = Visibility.Visible;
+        ApplyServiceStrategyButton.IsEnabled = hasPackage && StrategyComboBox.SelectedItem is StrategyItem && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
     }
 
     private void RefreshManualStrategyStatus()
@@ -509,12 +527,12 @@ public partial class MainWindow : Window
 
         if (strategies.Length == 0)
         {
-            ManualStrategyStatusText.Text = "Ручной запуск стратегии: не активен";
+            ManualStrategyStatusText.Text = "Не запущена вручную";
             ManualStrategyStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
             return;
         }
 
-        ManualStrategyStatusText.Text = $"Ручная стратегия работает: {string.Join(", ", strategies)}";
+        ManualStrategyStatusText.Text = $"Ручной запуск: {string.Join(", ", strategies)}";
         ManualStrategyStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
     }
 
@@ -641,12 +659,23 @@ public partial class MainWindow : Window
             {
                 runKey.DeleteValue("NetShift", throwOnMissingValue: false);
             }
+            UpdateAppAutoStartStatus();
         }
         catch (Exception error)
         {
             AppAutoStartCheckBox.IsChecked = !enabled;
+            UpdateAppAutoStartStatus();
             ThemedDialog.Show(this, error.Message, "Автозапуск NetShift", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void UpdateAppAutoStartStatus()
+    {
+        var enabled = AppAutoStartCheckBox.IsChecked == true;
+        AppAutoStartStatusText.Text = enabled ? "Включён" : "Отключён";
+        AppAutoStartStatusText.Foreground = enabled
+            ? System.Windows.Media.Brushes.LightGreen
+            : (System.Windows.Media.Brush)FindResource("MutedBrush");
     }
 
     private static bool IsAppAutoStartEnabled()
@@ -1081,7 +1110,43 @@ public partial class MainWindow : Window
             await RefreshServiceStatusAsync();
     }
 
-    private async void InstallService_Click(object sender, RoutedEventArgs e)
+    private async void ZapretServiceToggle_Click(object sender, RoutedEventArgs e)
+    {
+        await RunZapretServiceActionAsync(async () =>
+        {
+            if (ZapretServiceToggle.IsChecked == true)
+                await InstallZapretServiceAsync();
+            else
+                await RemoveZapretServiceAsync();
+        });
+    }
+
+    private async void InstallService_Click(object sender, RoutedEventArgs e) =>
+        await RunZapretServiceActionAsync(InstallZapretServiceAsync);
+
+    private async Task RunZapretServiceActionAsync(Func<Task> action)
+    {
+        if (_isZapretServiceActionRunning || _isZapretStrategyTestRunning) return;
+        _isZapretServiceActionRunning = true;
+        StrategyComboBox.IsEnabled = false;
+        StartStrategyButton.IsEnabled = false;
+        StopStrategyButton.IsEnabled = false;
+        CheckActiveStrategyButton.IsEnabled = false;
+        ZapretServiceToggle.IsEnabled = false;
+        ServiceRunButton.IsEnabled = false;
+        ApplyServiceStrategyButton.IsEnabled = false;
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            _isZapretServiceActionRunning = false;
+            UpdateZapretInventory();
+        }
+    }
+
+    private async Task InstallZapretServiceAsync()
     {
         if (StrategyComboBox.SelectedItem is not StrategyItem strategy) return;
         var folder = Path.GetDirectoryName(strategy.Path)!;
@@ -1089,43 +1154,41 @@ public partial class MainWindow : Window
         var message = isInstalled
             ? $"Заменить установленную службу zapret стратегией {strategy.Name}? NetShift изменит её только если она установлена из выбранной папки или папки NetShift. Потребуются права администратора."
             : $"Установить стратегию {strategy.Name} как автоматическую службу Windows?\n\n{folder}\n\nПотребуются права администратора.";
-        if (ThemedDialog.Show(this, message, "Установить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (await RunElevatedWorkerAsync("zapret-service-install", strategy.Path))
-        {
-            await RefreshServiceStatusAsync();
-            _ = CheckZapretStrategiesAsync(isInitialCheck: !_settings.InitialZapretStrategyCheckCompleted);
-        }
+        if (ThemedDialog.Show(this, message, isInstalled ? "Изменить стратегию службы" : "Установить службу zapret",
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+        var installed = await RunElevatedWorkerAsync("zapret-service-install", strategy.Path);
+        if (installed) _ = CheckZapretStrategiesAsync(isInitialCheck: !_settings.InitialZapretStrategyCheckCompleted);
     }
 
-    private async void StartService_Click(object sender, RoutedEventArgs e)
+    private async void ToggleServiceRun_Click(object sender, RoutedEventArgs e) =>
+        await RunZapretServiceActionAsync(() => _isZapretServiceRunning ? StopZapretServiceAsync() : StartZapretServiceAsync());
+
+    private async Task StartZapretServiceAsync()
     {
         if (!TryGetZapretFolder(out var folder)) return;
         if (await RunElevatedWorkerAsync("zapret-service-start", folder))
-        {
-            await RefreshServiceStatusAsync();
             _ = CheckZapretStrategiesAsync(isInitialCheck: !_settings.InitialZapretStrategyCheckCompleted);
-        }
     }
 
-    private async void StopService_Click(object sender, RoutedEventArgs e)
+    private async Task StopZapretServiceAsync()
     {
         if (!TryGetZapretFolder(out var folder)) return;
         if (ThemedDialog.Show(this, "Остановить службу zapret? Это временно прекратит работу выбранной стратегии.",
                 "Остановить службу", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (await RunElevatedWorkerAsync("zapret-service-stop", folder)) await RefreshServiceStatusAsync();
+        await RunElevatedWorkerAsync("zapret-service-stop", folder);
     }
 
-    private async void RemoveService_Click(object sender, RoutedEventArgs e)
+    private async Task RemoveZapretServiceAsync()
     {
-        if (!TryGetZapretFolder(out var folder)) return;
-        if (await QueryWindowsServiceAsync("zapret") is null) { await RefreshServiceStatusAsync(); return; }
+        if (!TryGetZapretFolder(out var folder))
+            return;
+        if (await QueryWindowsServiceAsync("zapret") is null) return;
         if (ThemedDialog.Show(this,
                 $"Остановить и удалить службу zapret из выбранной папки или папки NetShift?\n\nТекущий пакет: {folder}\n\nСлужбы и процессы других программ не затрагиваются.",
                 "Удалить службу zapret", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
-        if (await RunElevatedWorkerAsync("zapret-service-remove", folder)) await RefreshServiceStatusAsync();
+        await RunElevatedWorkerAsync("zapret-service-remove", folder);
     }
-
-    private async void RefreshServiceStatus_Click(object sender, RoutedEventArgs e) => await RefreshServiceStatusAsync();
 
     private async void CheckActiveStrategy_Click(object sender, RoutedEventArgs e)
     {
@@ -1276,10 +1339,9 @@ public partial class MainWindow : Window
         DownloadLatestButton.IsEnabled = false;
         StartStrategyButton.IsEnabled = false;
         StopStrategyButton.IsEnabled = false;
-        InstallServiceButton.IsEnabled = false;
-        StartServiceButton.IsEnabled = false;
-        StopServiceButton.IsEnabled = false;
-        RemoveServiceButton.IsEnabled = false;
+        ZapretServiceToggle.IsEnabled = false;
+        ServiceRunButton.IsEnabled = false;
+        ApplyServiceStrategyButton.IsEnabled = false;
         ZapretHealthStatusText.Text = $"Проверяю стратегии по порядку: 0 из {strategyPaths.Length}.";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Подготовка";

@@ -99,6 +99,41 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="CardSwitchStyle" TargetType="CheckBox">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid Width="46" Height="26">
+              <Border x:Name="SwitchTrack" CornerRadius="13" Background="#344258"
+                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
+              <Ellipse x:Name="SwitchThumb" Width="18" Height="18" Fill="#F3F7FC"
+                       HorizontalAlignment="Left" Margin="4,0,0,0" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="SwitchTrack" Property="Background" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right" />
+                <Setter TargetName="SwitchThumb" Property="Margin" Value="0,0,4,0" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.5" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="RadioButton">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="FontFamily" Value="Segoe UI" />
