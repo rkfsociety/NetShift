@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AboutVersionText.Text = $"Версия NetShift {NetShiftUpdateService.CurrentVersion}";
         _trayIcon = CreateTrayIcon();
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
         Closing += MainWindow_Closing;
@@ -90,22 +91,52 @@ public partial class MainWindow : Window
 
     private void NavigatePage_Click(object sender, RoutedEventArgs e)
     {
-        var showDns = string.Equals((sender as FrameworkElement)?.Tag?.ToString(), "dns", StringComparison.Ordinal);
-        DnsPage.Visibility = showDns ? Visibility.Visible : Visibility.Collapsed;
-        ZapretPage.Visibility = showDns ? Visibility.Collapsed : Visibility.Visible;
-        PageTitleText.Text = showDns ? "DNS" : "zapret";
+        var page = (sender as FrameworkElement)?.Tag?.ToString() ?? "dns";
+        DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
+        ZapretPage.Visibility = page == "zapret" ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        AboutPage.Visibility = page == "about" ? Visibility.Visible : Visibility.Collapsed;
+        PageTitleText.Text = page switch
+        {
+            "zapret" => "zapret",
+            "settings" => "Настройки",
+            "about" => "О программе",
+            _ => "DNS"
+        };
 
-        var selectedBackground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(7, 92, 198));
-        var selectedBorder = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(22, 132, 255));
-        var selectedForeground = System.Windows.Media.Brushes.White;
-        var idleBackground = (System.Windows.Media.Brush)FindResource("PanelBrush");
-        var idleForeground = (System.Windows.Media.Brush)FindResource("MutedBrush");
-        DnsNavigationButton.Background = showDns ? selectedBackground : idleBackground;
-        DnsNavigationButton.BorderBrush = showDns ? selectedBorder : System.Windows.Media.Brushes.Transparent;
-        DnsNavigationButton.Foreground = showDns ? selectedForeground : idleForeground;
-        ZapretNavigationButton.Background = showDns ? idleBackground : selectedBackground;
-        ZapretNavigationButton.BorderBrush = showDns ? System.Windows.Media.Brushes.Transparent : selectedBorder;
-        ZapretNavigationButton.Foreground = showDns ? idleForeground : selectedForeground;
+        SetNavigationButtonState(DnsNavigationButton, page == "dns");
+        SetNavigationButtonState(ZapretNavigationButton, page == "zapret");
+        SetNavigationButtonState(SettingsNavigationButton, page == "settings");
+        SetNavigationButtonState(AboutNavigationButton, page == "about");
+    }
+
+    private void SetNavigationButtonState(System.Windows.Controls.Button button, bool isSelected)
+    {
+        var transparentIdle = button == SettingsNavigationButton || button == AboutNavigationButton;
+        button.Background = (System.Windows.Media.Brush)FindResource(isSelected
+            ? "NavSelectedBrush"
+            : transparentIdle ? "SidebarBrush" : "PanelBrush");
+        button.BorderBrush = isSelected
+            ? (System.Windows.Media.Brush)FindResource("AccentBrush")
+            : System.Windows.Media.Brushes.Transparent;
+        button.Foreground = isSelected
+            ? System.Windows.Media.Brushes.White
+            : (System.Windows.Media.Brush)FindResource("MutedBrush");
+    }
+
+    private void MinimizeWindow_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void ToggleMaximizeWindow_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void CloseWindow_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (MaximizeWindowGlyph is null) return;
+        var maximized = WindowState == WindowState.Maximized;
+        MaximizeWindowGlyph.Text = maximized ? "\uE923" : "\uE922";
+        MaximizeWindowButton.ToolTip = maximized ? "Восстановить" : "Развернуть";
     }
 
     private void ApplyDarkTitleBar()

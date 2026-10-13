@@ -3,14 +3,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnMainWindowClose">
   <Application.Resources>
-    <SolidColorBrush x:Key="CanvasBrush" Color="#091321" />
-    <SolidColorBrush x:Key="PanelBrush" Color="#101D30" />
-    <SolidColorBrush x:Key="PanelRaisedBrush" Color="#16263D" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#263D5B" />
-    <SolidColorBrush x:Key="TextBrush" Color="#F1F5F9" />
-    <SolidColorBrush x:Key="MutedBrush" Color="#B6C3D6" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#0EA5E9" />
+    <SolidColorBrush x:Key="CanvasBrush" Color="#081321" />
+    <SolidColorBrush x:Key="SidebarBrush" Color="#0A1728" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#101E31" />
+    <SolidColorBrush x:Key="PanelRaisedBrush" Color="#172941" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#294361" />
+    <SolidColorBrush x:Key="TextBrush" Color="#F3F7FC" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#A9BED8" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#13BCE8" />
     <SolidColorBrush x:Key="AccentDarkBrush" Color="#0B3977" />
+    <LinearGradientBrush x:Key="LogoBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#0B314B" Offset="0" />
+      <GradientStop Color="#087A8C" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="NavSelectedBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#096DDF" Offset="0" />
+      <GradientStop Color="#0748B5" Offset="1" />
+    </LinearGradientBrush>
 
     <Style TargetType="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -33,23 +42,104 @@
       <Setter Property="Padding" Value="11,9" />
       <Setter Property="FontSize" Value="14" />
       <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="InputBorder" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="8">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="InputBorder" Property="Opacity" Value="0.62" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="CheckBox">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="FontFamily" Value="Segoe UI" />
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <BulletDecorator VerticalAlignment="Center">
+              <BulletDecorator.Bullet>
+                <Border x:Name="CheckBorder" Width="18" Height="18" CornerRadius="5"
+                        Background="#0D1727" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1.2" Margin="0,0,10,0">
+                  <Path x:Name="CheckMark" Data="M 3 9 L 7 13 L 15 4" Stroke="#062033" StrokeThickness="2.2"
+                        StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed" />
+                </Border>
+              </BulletDecorator.Bullet>
+              <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+            </BulletDecorator>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="CheckBorder" Property="Background" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.55" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="RadioButton">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="FontFamily" Value="Segoe UI" />
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <BulletDecorator VerticalAlignment="Center">
+              <BulletDecorator.Bullet>
+                <Grid Width="20" Height="20" Margin="0,0,10,0">
+                  <Ellipse x:Name="RadioOutline" Fill="#0D1727" Stroke="{StaticResource MutedBrush}" StrokeThickness="2" />
+                  <Ellipse x:Name="RadioDot" Width="9" Height="9" Fill="{StaticResource AccentBrush}" Visibility="Collapsed" />
+                </Grid>
+              </BulletDecorator.Bullet>
+              <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+            </BulletDecorator>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="RadioOutline" Property="Stroke" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="RadioDot" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="RadioOutline" Property="Stroke" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.55" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="ComboBox">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="Background" Value="#0D1727" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="8,7" />
+      <Setter Property="Padding" Value="11,9" />
+      <Setter Property="MinHeight" Value="46" />
       <Setter Property="FontSize" Value="14" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
@@ -146,6 +236,54 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="QuietScrollButtonStyle" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="DarkScrollThumbStyle" TargetType="Thumb">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Border x:Name="ScrollThumb" Background="#3A5675" CornerRadius="5" Margin="2" />
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ScrollThumb" Property="Background" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+              <Trigger Property="IsDragging" Value="True">
+                <Setter TargetName="ScrollThumb" Property="Background" Value="#58D0ED" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="11" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="OverridesDefaultStyle" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Grid Background="{TemplateBinding Background}" Width="{TemplateBinding Width}">
+              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource QuietScrollButtonStyle}" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb><Thumb Style="{StaticResource DarkScrollThumbStyle}" /></Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource QuietScrollButtonStyle}" />
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
@@ -167,12 +305,91 @@
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.84" />
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.9" />
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="ButtonBorder" Property="Background" Value="#1B2638" />
                 <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#344258" />
                 <Setter Property="Foreground" Value="#B6C3D6" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="NavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="20,17" />
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="MinHeight" Value="72" />
+      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="NavBorder" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="14" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="NavBorder" Property="Opacity" Value="0.9" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="NavBorder" Property="Opacity" Value="0.5" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="WindowControlButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Height" Value="42" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ControlBorder" Background="{TemplateBinding Background}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ControlBorder" Property="Background" Value="#1A2C43" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="ControlBorder" Property="Background" Value="#263D59" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="WindowCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowControlButtonStyle}">
+      <Setter Property="Width" Value="54" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="CloseBorder" Background="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                TextElement.Foreground="{TemplateBinding Foreground}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="CloseBorder" Property="Background" Value="#C42B3A" />
+                <Setter Property="Foreground" Value="White" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="CloseBorder" Property="Background" Value="#981D2B" />
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>

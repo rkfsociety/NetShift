@@ -1,89 +1,136 @@
 <Window x:Class="NetShift.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="NetShift" Icon="Assets/NetShift.ico" Width="1320" Height="880" MinWidth="1060" MinHeight="720"
-        WindowStartupLocation="CenterScreen" Background="{StaticResource CanvasBrush}"
-        Foreground="{StaticResource TextBrush}">
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="NetShift" Icon="Assets/NetShift.ico" Width="1440" Height="920" MinWidth="1120" MinHeight="760"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource CanvasBrush}" Foreground="{StaticResource TextBrush}"
+        StateChanged="MainWindow_StateChanged">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="6" GlassFrameThickness="0"
+                        CornerRadius="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
   <Grid>
-    <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="250" />
-      <ColumnDefinition Width="*" />
-    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="42" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <Border Grid.RowSpan="2" Background="{StaticResource CanvasBrush}"
+            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
 
-    <Border Grid.Column="0" Background="#0D1929" BorderBrush="{StaticResource BorderBrush}"
-            BorderThickness="0,0,1,0" Padding="20,32,16,20">
-      <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top">
-          <StackPanel Orientation="Horizontal" Margin="0,0,0,34">
-            <Border Width="50" Height="50" CornerRadius="12" Background="#0B536C" BorderBrush="#0EA5E9" BorderThickness="1">
-              <TextBlock Text="N" Foreground="White" FontSize="30" FontWeight="Bold"
-                         HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <TextBlock Text="NetShift" FontSize="26" FontWeight="Bold" VerticalAlignment="Center" Margin="14,0,0,0" />
-          </StackPanel>
-          <Button x:Name="DnsNavigationButton" Tag="dns" Click="NavigatePage_Click"
-                  HorizontalContentAlignment="Stretch" Padding="18,16" FontSize="18" Background="#075CC6"
-                  BorderBrush="#1684FF" Foreground="White">
-            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="23" Margin="0,0,16,0"/><TextBlock Text="DNS" VerticalAlignment="Center"/></StackPanel>
-          </Button>
-          <Button x:Name="ZapretNavigationButton" Tag="zapret" Click="NavigatePage_Click"
-                  HorizontalContentAlignment="Stretch" Padding="18,16" FontSize="18" Margin="0,10,0,0"
-                  Background="{StaticResource PanelBrush}" BorderBrush="Transparent" Foreground="#A9BCD8">
-            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="23" Margin="0,0,16,0"/><TextBlock Text="zapret" VerticalAlignment="Center"/></StackPanel>
-          </Button>
+    <Grid Grid.Row="0" Background="#08111E" Panel.ZIndex="1">
+      <DockPanel LastChildFill="False">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+          <Image Source="Assets/NetShift.ico" Width="18" Height="18" Stretch="Uniform" />
+          <TextBlock Text="NetShift" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="9,0,0,0" />
         </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,4">
-          <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,18" />
-          <TextBlock Text="Системные действия подтверждаются Windows."
-                     Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" />
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Style="{StaticResource WindowControlButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                  Click="MinimizeWindow_Click" ToolTip="Свернуть">
+            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+          </Button>
+          <Button x:Name="MaximizeWindowButton" Style="{StaticResource WindowControlButtonStyle}"
+                  shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="ToggleMaximizeWindow_Click" ToolTip="Развернуть">
+            <TextBlock x:Name="MaximizeWindowGlyph" Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+          </Button>
+          <Button Style="{StaticResource WindowCloseButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                  Click="CloseWindow_Click" ToolTip="Закрыть">
+            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+          </Button>
         </StackPanel>
       </DockPanel>
-    </Border>
+    </Grid>
 
-    <Grid Grid.Column="1">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-      </Grid.RowDefinitions>
-      <Grid Grid.Row="0" Margin="28,20,26,20">
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="272" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="0,0,1,0" Padding="20,28,18,20">
+        <DockPanel LastChildFill="True">
+          <StackPanel DockPanel.Dock="Top">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,42">
+              <Border Width="58" Height="58" CornerRadius="15" Background="{StaticResource LogoBrush}"
+                      BorderBrush="#14B8E8" BorderThickness="1">
+                <TextBlock Text="N" Foreground="White" FontSize="34" FontWeight="Bold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
+                <TextBlock Text="NetShift" FontSize="29" FontWeight="Bold" />
+                <TextBlock Text="Сеть под контролем" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="1,1,0,0" />
+              </StackPanel>
+            </StackPanel>
+            <Button x:Name="DnsNavigationButton" Tag="dns" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" Background="{StaticResource NavSelectedBrush}"
+                    BorderBrush="#1787F5" Foreground="White">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="DNS" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+            <Button x:Name="ZapretNavigationButton" Tag="zapret" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" Margin="0,10,0,0"
+                    Background="{StaticResource PanelBrush}" BorderBrush="Transparent" Foreground="{StaticResource MutedBrush}">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="zapret" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
+            </Button>
+          </StackPanel>
+          <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,2">
+            <Button x:Name="SettingsNavigationButton" Tag="settings" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12"
+                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+            </Button>
+            <Button x:Name="AboutNavigationButton" Tag="about" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12" Margin="0,5,0,0"
+                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="О программе" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+            </Button>
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,14" />
+            <TextBlock Text="Системные действия подтверждаются Windows."
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="2,18,2,0" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Column="1">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="28,14,28,12">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock x:Name="PageTitleText" Text="DNS" FontSize="34" FontWeight="Bold" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Width="430" HorizontalAlignment="Right">
-          <DockPanel LastChildFill="False" HorizontalAlignment="Right">
-            <CheckBox x:Name="AppAutoStartCheckBox" Content="Автозапуск NetShift" Click="AppAutoStart_Click"
-                      DockPanel.Dock="Right" FontSize="13" VerticalAlignment="Center" Margin="0,0,0,10" />
-          </DockPanel>
-          <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10,8">
+        <TextBlock x:Name="PageTitleText" Text="DNS" FontSize="36" FontWeight="Bold" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Width="432" HorizontalAlignment="Right">
+          <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="13,10">
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                <Ellipse x:Name="DnsServiceIndicator" Width="12" Height="12" Fill="#718096" Margin="0,0,12,0" />
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                <Ellipse x:Name="DnsServiceIndicator" Width="13" Height="13" Fill="#718096" Margin="0,0,12,0" />
                 <StackPanel>
                   <TextBlock Text="Служба DNS" FontSize="16" FontWeight="SemiBold" />
                   <TextBlock x:Name="DnsServiceStatusText" Text="Проверка состояния…" Foreground="{StaticResource MutedBrush}" FontSize="13" />
                 </StackPanel>
               </StackPanel>
-              <Button Grid.Column="1" Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="11,8" MinHeight="40" />
+              <Button Grid.Column="1" Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="13,8" MinHeight="42" />
             </Grid>
           </Border>
-          <TextBlock x:Name="UpdateStatusText" Text="Проверка обновлений…" Foreground="{StaticResource MutedBrush}"
-                     FontSize="11" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="0,6,0,0" />
           <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
                     Padding="12,7" MinHeight="38" MinWidth="205" Margin="0,0,8,0" />
             <Button x:Name="InstallDnsServiceButton" Content="Установить службу DNS" Click="InstallDnsService_Click"
                     Visibility="Collapsed" Padding="10,5" MinHeight="32" />
             <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click"
-                    Padding="10,5" MinHeight="32" />
+                    Padding="12,7" MinHeight="38" />
           </WrapPanel>
+          <TextBlock x:Name="UpdateStatusText" Text="Проверка обновлений…" Foreground="{StaticResource MutedBrush}"
+                     FontSize="11" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="0,5,2,0" />
         </StackPanel>
       </Grid>
 
       <Grid Grid.Row="1">
-        <ScrollViewer x:Name="DnsPage" VerticalScrollBarVisibility="Auto" Padding="26,0,26,24">
+        <ScrollViewer x:Name="DnsPage" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="30">
               <StackPanel>
@@ -172,7 +219,7 @@
                 <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,22,0,18" />
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="White"
+                  <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="#062033"
                           BorderBrush="{StaticResource AccentBrush}" Click="ApplyDns_Click" MinHeight="54" FontSize="17" />
                   <Button Grid.Column="2" Content="Вернуть DHCP" Click="ResetDns_Click" MinHeight="54" FontSize="17" />
                 </Grid>
@@ -181,9 +228,9 @@
           </StackPanel>
         </ScrollViewer>
 
-        <ScrollViewer x:Name="ZapretPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="2,4,8,10">
+        <ScrollViewer x:Name="ZapretPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20" Margin="0,0,0,14">
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="26" Margin="0,0,0,16">
               <StackPanel>
                 <Grid Margin="0,0,0,12">
                   <Grid.ColumnDefinitions>
@@ -213,7 +260,7 @@
               </StackPanel>
             </Border>
 
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="20">
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="26">
               <StackPanel>
                 <TextBlock Text="Запуск и служба Windows" FontSize="17" FontWeight="SemiBold" />
                 <TextBlock Text="Выберите стратегию для запуска или службы Windows."
@@ -369,7 +416,62 @@
             </Border>
           </StackPanel>
         </ScrollViewer>
+
+        <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
+          <StackPanel>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="18" Padding="28" Margin="0,0,0,16">
+              <StackPanel>
+                <TextBlock Text="Запуск приложения" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="Настройте, как NetShift запускается вместе с Windows. Служба DNS продолжит работать независимо от приложения."
+                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,18" />
+                <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="12" Padding="16,14">
+                  <CheckBox x:Name="AppAutoStartCheckBox" Content="Запускать NetShift вместе с Windows"
+                            Click="AppAutoStart_Click" FontSize="15" VerticalAlignment="Center" />
+                </Border>
+              </StackPanel>
+            </Border>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="18" Padding="28">
+              <StackPanel>
+                <TextBlock Text="Обновления" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="NetShift проверяет последнюю доступную версию и обновляет установленное приложение с сохранением сетевых настроек."
+                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
+                <TextBlock Text="Проверить обновления можно в верхней части окна."
+                           Foreground="{StaticResource MutedBrush}" FontSize="13" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
+          <StackPanel>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="18" Padding="32">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                  <Border Width="58" Height="58" CornerRadius="15" Background="{StaticResource LogoBrush}"
+                          BorderBrush="#14B8E8" BorderThickness="1">
+                    <TextBlock Text="N" Foreground="White" FontSize="34" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
+                    <TextBlock Text="NetShift" FontSize="27" FontWeight="Bold" />
+                    <TextBlock Text="Сеть под контролем" Foreground="{StaticResource MutedBrush}" FontSize="13" />
+                  </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Управление DNS и zapret в одном приложении. Настройки сети применяются только после подтверждения Windows."
+                           Foreground="{StaticResource MutedBrush}" FontSize="15" TextWrapping="Wrap" />
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,24,0,18" />
+                <TextBlock x:Name="AboutVersionText" Text="Версия NetShift" FontSize="15" FontWeight="SemiBold" />
+                <TextBlock Text="NetShift · Windows" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,5,0,0" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
       </Grid>
     </Grid>
+  </Grid>
   </Grid>
 </Window>
