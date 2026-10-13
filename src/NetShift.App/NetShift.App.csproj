@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NetShift.App</RootNamespace>
     <AssemblyName>NetShift</AssemblyName>
-    <Version>0.3.042</Version>
+    <Version>0.3.043</Version>
     <ApplicationIcon>Assets\NetShift.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup Condition="'$(NetShiftUpdateRepository)' != ''">
