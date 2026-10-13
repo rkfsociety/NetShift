@@ -23,6 +23,11 @@ public static class NetShiftUpdateService
         return client;
     }
 
+    private static string UpdatesDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "Updates");
+
+    private static string UpdateLogPath => Path.Combine(UpdatesDirectory, "update.log");
+
     public static string CurrentVersion
     {
         get
@@ -62,9 +67,41 @@ public static class NetShiftUpdateService
         try { File.Delete(backupPath); } catch { }
     }
 
+    internal static string? GetPendingUpdateFailure(string[] args, string? logPath = null)
+    {
+        if (args.Length != 1 || !args[0].Equals("--update-failed", StringComparison.Ordinal))
+            return null;
+
+        var resolvedLogPath = logPath ?? UpdateLogPath;
+        string message;
+        try
+        {
+            message = File.Exists(resolvedLogPath) ? File.ReadAllText(resolvedLogPath).Trim() : string.Empty;
+        }
+        catch (IOException)
+        {
+            message = string.Empty;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            message = string.Empty;
+        }
+
+        try { File.Delete(resolvedLogPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        return string.IsNullOrWhiteSpace(message) ? "Не удалось получить подробности сбоя обновления." : message;
+    }
+
+    internal static string BuildSha256PowerShellFunction() =>
+        "function Get-Sha256Hex([string]$path) { " +
+        "$stream = $null; $algorithm = $null; " +
+        "try { $stream = [IO.File]::OpenRead($path); $algorithm = [Security.Cryptography.SHA256]::Create(); " +
+        "return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() } " +
+        "finally { if ($null -ne $stream) { $stream.Dispose() }; if ($null -ne $algorithm) { $algorithm.Dispose() } } }; ";
+
     internal static string BuildUpdaterScript(string source, string target, string backup, string replacement, string sourceHash,
         string workingDirectory, string logPath, int processId) =>
         "$ErrorActionPreference = 'Stop'; " +
+        BuildSha256PowerShellFunction() +
         $"$source = {PsLiteral(source)}; $target = {PsLiteral(target)}; $backup = {PsLiteral(backup)}; $replacement = {PsLiteral(replacement)}; " +
         $"$sourceHash = {PsLiteral(sourceHash)}; " +
         $"$workingDirectory = {PsLiteral(workingDirectory)}; $logPath = {PsLiteral(logPath)}; " +
@@ -73,9 +110,9 @@ public static class NetShiftUpdateService
         "Wait-Process -Id $parentId -Timeout 120 -ErrorAction SilentlyContinue; " +
         "if (Get-Process -Id $parentId -ErrorAction SilentlyContinue) { throw 'NetShift не завершился за отведённое время.' }; " +
         "if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'Файл обновления не найден.' }; " +
-        "if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $sourceHash) { throw 'Файл обновления изменился после проверки.' }; " +
+        "if (-not [string]::Equals((Get-Sha256Hex $source), $sourceHash, [StringComparison]::OrdinalIgnoreCase)) { throw 'Файл обновления изменился после проверки.' }; " +
         "Copy-Item -LiteralPath $source -Destination $replacement; " +
-        "if ((Get-FileHash -LiteralPath $replacement -Algorithm SHA256).Hash -ne $sourceHash) { throw 'Не удалось проверить временную копию обновления.' }; " +
+        "if (-not [string]::Equals((Get-Sha256Hex $replacement), $sourceHash, [StringComparison]::OrdinalIgnoreCase)) { throw 'Не удалось проверить временную копию обновления.' }; " +
         "[IO.File]::Replace($replacement, $target, $backup, $true); " +
         "$startInfo = [Diagnostics.ProcessStartInfo]::new($target); $startInfo.WorkingDirectory = $workingDirectory; $startInfo.UseShellExecute = $false; " +
         "$startInfo.Arguments = '--confirm-update \"' + $backup + '\"'; $newProcess = [Diagnostics.Process]::Start($startInfo); " +
@@ -88,7 +125,10 @@ public static class NetShiftUpdateService
         "if (Test-Path -LiteralPath $backup) { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }; Move-Item -LiteralPath $backup -Destination $target -Force }; " +
         "if (Test-Path -LiteralPath $replacement) { Remove-Item -LiteralPath $replacement -Force }; " +
         "[IO.File]::WriteAllText($logPath, $_.Exception.Message); " +
-        "try { Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show(('Не удалось обновить NetShift: ' + $_.Exception.Message), 'NetShift') | Out-Null } catch {}; " +
+        "$failureInfo = [Diagnostics.ProcessStartInfo]::new($target); $failureInfo.WorkingDirectory = $workingDirectory; " +
+        "$failureInfo.UseShellExecute = $false; $failureInfo.Arguments = '--update-failed'; " +
+        "if ((Test-Path -LiteralPath $target -PathType Leaf) -and -not (Get-Process -Id $parentId -ErrorAction SilentlyContinue)) { " +
+        "try { [void][Diagnostics.Process]::Start($failureInfo) } catch { [IO.File]::AppendAllText($logPath, [Environment]::NewLine + $_.Exception.Message) } }; " +
         "} finally { if (Test-Path -LiteralPath $replacement) { Remove-Item -LiteralPath $replacement -Force -ErrorAction SilentlyContinue } }";
 
     public static string? Repository
@@ -203,7 +243,7 @@ public static class NetShiftUpdateService
 
     public static void LaunchUpdater(string stagedExecutablePath, string targetExecutablePath, int processId)
     {
-        var updatesRoot = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "Updates")) + Path.DirectorySeparatorChar;
+        var updatesRoot = Path.GetFullPath(UpdatesDirectory) + Path.DirectorySeparatorChar;
         var source = Path.GetFullPath(stagedExecutablePath);
         var target = Path.GetFullPath(targetExecutablePath);
         if (!source.StartsWith(updatesRoot, StringComparison.OrdinalIgnoreCase) ||
@@ -214,7 +254,7 @@ public static class NetShiftUpdateService
         var workingDirectory = Path.GetDirectoryName(target)!;
         var backup = target + ".update-backup-" + Guid.NewGuid().ToString("N");
         var replacement = target + ".update-new-" + Guid.NewGuid().ToString("N");
-        var logPath = Path.Combine(Path.GetDirectoryName(source)!, "update.log");
+        var logPath = UpdateLogPath;
         using var sourceStream = File.OpenRead(source);
         var sourceHash = Convert.ToHexString(SHA256.HashData(sourceStream));
         var script = BuildUpdaterScript(source, target, backup, replacement, sourceHash, workingDirectory, logPath, processId);

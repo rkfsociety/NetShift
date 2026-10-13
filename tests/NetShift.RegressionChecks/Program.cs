@@ -98,7 +98,11 @@ static void CheckUpdateConfirmation()
         @"C:\Users\O'Brien\AppData\Local\NetShift\Updates\update.log", 42);
     if (!updaterScript.Contains("[IO.File]::Replace", StringComparison.Ordinal) ||
         !updaterScript.Contains("--confirm-update", StringComparison.Ordinal) ||
-        !updaterScript.Contains("Move-Item -LiteralPath $backup -Destination $target", StringComparison.Ordinal))
+        !updaterScript.Contains("Move-Item -LiteralPath $backup -Destination $target", StringComparison.Ordinal) ||
+        updaterScript.Contains("Get-FileHash", StringComparison.Ordinal) ||
+        !updaterScript.Contains("Get-Sha256Hex", StringComparison.Ordinal) ||
+        !updaterScript.Contains("--update-failed", StringComparison.Ordinal) ||
+        updaterScript.Contains("[System.Windows.MessageBox]::Show", StringComparison.Ordinal))
         throw new InvalidOperationException("The updater no longer verifies, confirms, and rolls back its installation.");
     var nestedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(updaterScript));
     RunPowerShell("$scriptText=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('" + nestedScript + "'));" +
@@ -109,6 +113,21 @@ static void CheckUpdateConfirmation()
     Directory.CreateDirectory(directory);
     try
     {
+        var hashInput = Path.Combine(directory, "hash-input.bin");
+        File.WriteAllText(hashInput, "NetShift updater hash check");
+        var expectedHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(hashInput)));
+        var hashScript = NetShiftUpdateService.BuildSha256PowerShellFunction() +
+            $"if (-not [string]::Equals((Get-Sha256Hex {PowerShellLiteral(hashInput)}), '{expectedHash}', [StringComparison]::OrdinalIgnoreCase)) {{ throw 'The updater SHA-256 helper returned the wrong hash.' }}";
+        RunPowerShell(hashScript);
+
+        var logPath = Path.Combine(directory, "update.log");
+        File.WriteAllText(logPath, "Проверка обновления не пройдена.");
+        var failure = NetShiftUpdateService.GetPendingUpdateFailure(["--update-failed"], logPath);
+        if (failure != "Проверка обновления не пройдена." || File.Exists(logPath))
+            throw new InvalidOperationException("The updater failure was not delivered to the application and cleared.");
+        if (NetShiftUpdateService.GetPendingUpdateFailure(["--other"], logPath) is not null)
+            throw new InvalidOperationException("An unrelated application argument was treated as an update failure.");
+
         var executable = Path.Combine(directory, "NetShift.exe");
         var backup = executable + ".update-backup-" + Guid.NewGuid().ToString("N");
         File.WriteAllText(executable, "current");
@@ -132,6 +151,8 @@ static void CheckUpdateConfirmation()
     }
     finally { Directory.Delete(directory, recursive: true); }
 }
+
+static string PowerShellLiteral(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
 
 static void CheckExecutableReleaseMetadata()
 {
