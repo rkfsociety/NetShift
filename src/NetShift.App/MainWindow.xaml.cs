@@ -131,7 +131,7 @@ public partial class MainWindow : Window
             page = "dns";
 
         var isBasicMode = page == "basic";
-        var targetWidth = isBasicMode ? 760d : 1120d;
+        var targetWidth = isBasicMode ? 560d : 1120d;
         if (Width != targetWidth)
         {
             if (IsLoaded && WindowState == WindowState.Normal)
