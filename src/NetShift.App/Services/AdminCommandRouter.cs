@@ -630,75 +630,32 @@ public static class AdminCommandRouter
             .ToArray();
         if (strategies.Length == 0) throw new InvalidOperationException("В выбранной папке не найдены стратегии general*.bat.");
 
+        ZapretConnectivityTester.EnsureCurlAvailable();
         EnsureZapretCanBeTested();
+        var targets = ZapretConnectivityTester.LoadTargets(folder);
         var testedCount = 0;
-        string? recommendedPath = null;
-        var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, EmptyTargetResults(),
-            $"Подготовка проверки {strategies.Length} стратегий.");
+        var candidates = new List<(string Path, ZapretConnectivitySummary Summary)>();
+        var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, [], 0, 0, 0, 0,
+            $"Подготовка проверки {strategies.Length} стратегий по {targets.Count} целям.");
         WriteZapretTestProgress(progressPath, progress);
 
         foreach (var strategyPath in strategies)
         {
             EnsureZapretCanBeTested();
             var strategyName = Path.GetFileNameWithoutExtension(strategyPath);
-            var targetResults = EmptyTargetResults();
-            Process? winws = null;
-            var passed = false;
+            Process? batchProcess = null;
+            ZapretConnectivitySummary? summary = null;
             string? failure = null;
-            progress = new ZapretTestProgress(strategyPath, "starting", testedCount + 1, strategies.Length, targetResults,
-                $"Запускаю временно {strategyName}.", recommendedPath);
+            progress = new ZapretTestProgress(strategyPath, "starting", testedCount + 1, strategies.Length, [], 0, 0, 0, 0,
+                $"Запускаю временно {strategyName}.");
             WriteZapretTestProgress(progressPath, progress);
 
             try
             {
-                var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
-                var startInfo = new ProcessStartInfo(executable)
-                {
-                    Arguments = BuildStrategyArguments(strategyPath, folder),
-                    WorkingDirectory = folder,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                winws = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить winws.exe.");
-                Thread.Sleep(TimeSpan.FromSeconds(2));
-                if (winws.HasExited)
-                    throw new InvalidOperationException($"winws.exe завершился с кодом {winws.ExitCode}.");
-
-                progress = progress with { Phase = "checking", Message = $"Проверяю сайты через {strategyName}…" };
+                batchProcess = StartZapretTestBatch(strategyPath, folder);
+                progress = progress with { Phase = "checking", Message = $"Проверяю {targets.Count} целей через {strategyName}: HTTP/1.1, TLS 1.2, TLS 1.3 и ping…" };
                 WriteZapretTestProgress(progressPath, progress);
-                (string Name, string Url)[] targetChecks =
-                [
-                    ("Discord", "https://discord.com"),
-                    ("YouTube", "https://www.youtube.com"),
-                    ("Google", "https://www.google.com")
-                ];
-                var results = new List<(string Name, bool Reachable)>(targetChecks.Length);
-                foreach (var target in targetChecks)
-                {
-                    if (winws.HasExited) break;
-
-                    var reachable = ProbeZapretTargetAsync(target.Url).GetAwaiter().GetResult();
-                    results.Add((target.Name, reachable));
-                    targetResults[target.Name] = reachable;
-                    progress = progress with
-                    {
-                        Targets = new Dictionary<string, bool?>(targetResults),
-                        Message = $"{strategyName}: проверка {target.Name} завершена."
-                    };
-                    WriteZapretTestProgress(progressPath, progress);
-                }
-
-                passed = results.Count == targetChecks.Length && results.All(result => result.Reachable) && !winws.HasExited;
-                if (!passed)
-                {
-                    if (winws.HasExited)
-                        failure = $"winws.exe завершился во время проверки с кодом {winws.ExitCode}.";
-                    else
-                    {
-                        var failedTargets = results.Where(result => !result.Reachable).Select(result => result.Name);
-                        failure = $"Нет ответа от: {string.Join(", ", failedTargets)}.";
-                    }
-                }
+                summary = ZapretConnectivityTester.CheckTargetsAsync(targets).GetAwaiter().GetResult();
             }
             catch (Exception error)
             {
@@ -706,48 +663,103 @@ public static class AdminCommandRouter
             }
             finally
             {
-                if (winws is not null)
+                try { StopZapretTestBatch(folder, batchProcess); }
+                catch (Exception error)
                 {
-                    try
-                    {
-                        if (!winws.HasExited)
-                        {
-                            try { winws.Kill(entireProcessTree: true); }
-                            catch (InvalidOperationException) when (winws.HasExited) { }
-                            if (!winws.WaitForExit(10_000))
-                                throw new TimeoutException($"Не удалось остановить временную стратегию {strategyName}.");
-                        }
-                    }
-                    finally { winws.Dispose(); }
+                    failure = error.Message;
+                    summary = null;
                 }
+                batchProcess?.Dispose();
             }
 
             testedCount++;
-            if (passed)
+            if (summary is not null)
             {
-                recommendedPath = Path.GetFullPath(strategyPath);
-                progress = new ZapretTestProgress(strategyPath, "recommended", testedCount, strategies.Length,
-                    new Dictionary<string, bool?>(targetResults), $"Все сайты доступны. Рекомендуем {strategyName}.", recommendedPath);
-                WriteZapretTestProgress(progressPath, progress);
-                break;
+                candidates.Add((Path.GetFullPath(strategyPath), summary));
+                progress = new ZapretTestProgress(strategyPath, "scored", testedCount, strategies.Length,
+                    summary.Groups, summary.HttpPassed, summary.HttpTotal, summary.PingPassed, summary.PingTotal,
+                    $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.");
             }
-
-            progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length,
-                new Dictionary<string, bool?>(targetResults), $"{strategyName} не прошла проверку. {failure}");
+            else
+                progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length, [], 0, 0, 0, 0,
+                    $"Не удалось проверить {strategyName}. {failure}");
             WriteZapretTestProgress(progressPath, progress);
         }
 
-        progress = progress with
-        {
-            Phase = "completed",
-            StrategyIndex = testedCount,
-            Message = recommendedPath is null
-                ? $"Подходящая стратегия не найдена. Проверено: {testedCount} из {strategies.Length}."
-                : $"Рекомендуемая стратегия: {Path.GetFileNameWithoutExtension(recommendedPath)}. Проверка завершена.",
-            RecommendedPath = recommendedPath,
-            Completed = true
-        };
+        var bestCandidate = candidates.FirstOrDefault();
+        foreach (var candidate in candidates.Skip(1))
+            if (ZapretConnectivityTester.CompareScores(candidate.Summary, bestCandidate.Summary) > 0)
+                bestCandidate = candidate;
+
+        var recommendedPath = candidates.Count == 0 ? null : bestCandidate.Path;
+        var bestSummary = candidates.Count == 0 ? null : bestCandidate.Summary;
+        progress = new ZapretTestProgress(null, "completed", testedCount, strategies.Length,
+            bestSummary?.Groups ?? [], bestSummary?.HttpPassed ?? 0, bestSummary?.HttpTotal ?? 0,
+            bestSummary?.PingPassed ?? 0, bestSummary?.PingTotal ?? 0,
+            recommendedPath is null
+                ? $"Не удалось запустить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}."
+                : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}.",
+            recommendedPath,
+            Completed: true);
         WriteZapretTestProgress(progressPath, progress);
+    }
+
+    private static Process StartZapretTestBatch(string strategyPath, string folder)
+    {
+        var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+        var startInfo = new ProcessStartInfo("cmd.exe")
+        {
+            WorkingDirectory = folder,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.Environment["NO_UPDATE_CHECK"] = "1";
+        startInfo.ArgumentList.Add("/d");
+        startInfo.ArgumentList.Add("/s");
+        startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add($"\"\"{strategyPath}\"\"");
+        var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить выбранный .bat.");
+
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            if (IsZapretProcessRunning(executable)) return process;
+            Thread.Sleep(200);
+        }
+
+        var exitCode = process.HasExited ? $" Код завершения сценария: {process.ExitCode}." : string.Empty;
+        try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+        process.Dispose();
+        throw new InvalidOperationException("Оригинальный сценарий не запустил winws.exe из выбранного пакета за 5 секунд." + exitCode);
+    }
+
+    private static void StopZapretTestBatch(string folder, Process? batchProcess)
+    {
+        if (batchProcess is not null && !batchProcess.HasExited)
+        {
+            try { batchProcess.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) when (batchProcess.HasExited) { }
+            if (!batchProcess.WaitForExit(10_000))
+                throw new TimeoutException("Не удалось завершить командный сценарий тестируемой стратегии.");
+        }
+
+        var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            using (process)
+            {
+                string? runningPath;
+                try { runningPath = process.MainModule?.FileName; }
+                catch { continue; }
+                if (string.IsNullOrWhiteSpace(runningPath) ||
+                    !Path.GetFullPath(runningPath).Equals(executable, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try { process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) when (process.HasExited) { }
+                if (!process.WaitForExit(10_000))
+                    throw new TimeoutException("Не удалось остановить временный winws.exe после проверки.");
+            }
+        }
     }
 
     private static void EnsureZapretCanBeTested()
@@ -768,24 +780,6 @@ public static class AdminCommandRouter
                     : $"Уже работает winws.exe ({path}). Остановите активную стратегию перед проверкой списка.");
             }
         }
-    }
-
-    private static Dictionary<string, bool?> EmptyTargetResults() => new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Discord"] = null,
-        ["YouTube"] = null,
-        ["Google"] = null
-    };
-
-    private static async Task<bool> ProbeZapretTargetAsync(string url)
-    {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(7) };
-        try
-        {
-            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-            return true;
-        }
-        catch { return false; }
     }
 
     private static string RequireZapretTestProgressPath(string path)

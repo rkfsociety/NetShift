@@ -5,7 +5,13 @@ internal sealed record ZapretTestProgress(
     string Phase,
     int StrategyIndex,
     int StrategyCount,
-    Dictionary<string, bool?> Targets,
+    Dictionary<string, ZapretTestGroupSummary> Groups,
+    int HttpPassed,
+    int HttpTotal,
+    int PingPassed,
+    int PingTotal,
     string Message,
     string? RecommendedPath = null,
     bool Completed = false);
+
+internal sealed record ZapretTestGroupSummary(int HttpPassed, int HttpTotal, int PingPassed, int PingTotal);

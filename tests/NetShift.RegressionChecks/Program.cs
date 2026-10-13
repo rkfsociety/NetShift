@@ -5,6 +5,8 @@ using NetShift.App.Models;
 using NetShift.App.Services;
 
 CheckDnsProviderAddressEditing();
+CheckZapretTargetParsing();
+CheckZapretCurlModesAndRanking();
 CheckBackupIsIdempotent();
 CheckBackupSurvivesMissingAdapter();
 CheckDnsRestore(true, true, "reset");
@@ -22,6 +24,73 @@ static void CheckDnsProviderAddressEditing()
     var manualProviders = DnsProvider.Presets.Where(provider => provider.RequiresManualAddressInput).ToArray();
     if (addressProviders.Length == 0 || manualProviders.Length != 1 || !manualProviders[0].Name.Equals("Свой DNS", StringComparison.Ordinal))
         throw new InvalidOperationException("DNS presets and the custom provider no longer select the expected address editor state.");
+}
+
+static void CheckZapretTargetParsing()
+{
+    const string targetsFile = """
+    DiscordMain = "https://discord.com"
+    DiscordGateway = "https://gateway.discord.gg"
+    DiscordCDN = "https://cdn.discordapp.com"
+    DiscordUpdates = "https://updates.discord.com"
+    YouTubeWeb = "https://www.youtube.com"
+    YouTubeShort = "https://youtu.be"
+    YouTubeImage = "https://i.ytimg.com"
+    YouTubeVideoRedirect = "https://redirector.googlevideo.com"
+    GoogleMain = "https://www.google.com"
+    GoogleGstatic = "https://www.gstatic.com"
+    CloudflareWeb = "https://www.cloudflare.com"
+    CloudflareCDN = "https://cdnjs.cloudflare.com"
+    CloudflareDNS1111 = "PING:1.1.1.1"
+    CloudflareDNS1001 = "PING:1.0.0.1"
+    GoogleDNS8888 = "PING:8.8.8.8"
+    GoogleDNS8844 = "PING:8.8.4.4"
+    """;
+    var parsed = ZapretConnectivityTester.ParseTargets(targetsFile);
+    if (parsed.Count != 16 || parsed.Count(target => target.Url is not null) != 12 || parsed.Count(target => target.Url is null) != 4)
+        throw new InvalidOperationException("The zapret tester did not load the targets.txt URL and ping-only entries.");
+    if (parsed.Count(target => target.Group == "Discord") != 4 || parsed.Count(target => target.Group == "YouTube") != 4 ||
+        parsed.Count(target => target.Group == "Google") != 4 || parsed.Count(target => target.Group == "Cloudflare") != 4)
+        throw new InvalidOperationException("The zapret target groups no longer match the official list.");
+
+    var defaults = ZapretConnectivityTester.ParseTargets(string.Empty);
+    if (defaults.Count != 17 || defaults.Count(target => target.Url is not null) != 12 || defaults.Count(target => target.Url is null) != 5)
+        throw new InvalidOperationException("The zapret tester fallback targets no longer match test zapret.ps1.");
+}
+
+static void CheckZapretCurlModesAndRanking()
+{
+    var http11 = ZapretConnectivityTester.BuildCurlArguments("https://discord.com", "HTTP");
+    var tls12 = ZapretConnectivityTester.BuildCurlArguments("https://discord.com", "TLS1.2");
+    var tls13 = ZapretConnectivityTester.BuildCurlArguments("https://discord.com", "TLS1.3");
+    var expected = new[]
+    {
+        "-I", "-s", "-m", "4", "--connect-timeout", "2", "-o", "NUL", "-w", "%{http_code}",
+        "--show-error", "--tlsv1.2", "--tls-max", "1.2", "https://discord.com"
+    };
+    if (!tls12.SequenceEqual(expected))
+        throw new InvalidOperationException("The TLS 1.2 curl probe differs from the original standard tester.");
+    if (http11[^2] != "--http1.1" || tls13[^4] != "--tlsv1.3" || tls13[^3] != "--tls-max" || tls13[^2] != "1.3")
+        throw new InvalidOperationException("The HTTP/1.1 or TLS 1.3 curl probe differs from the original standard tester.");
+
+    var lessHttp = new ZapretConnectivitySummary(35, 36, 16, 16, [], []);
+    var morePing = new ZapretConnectivitySummary(35, 36, 17, 17, [], []);
+    var moreHttp = new ZapretConnectivitySummary(36, 36, 0, 17, [], []);
+    if (ZapretConnectivityTester.CompareScores(morePing, lessHttp) <= 0 ||
+        ZapretConnectivityTester.CompareScores(moreHttp, morePing) <= 0)
+        throw new InvalidOperationException("Zapret strategy ranking must prioritize HTTP/TLS successes, then ping successes.");
+
+    var discord = ZapretConnectivityTester.ParseTargets("DiscordMain = \"https://discord.com\"")[0];
+    var targetResult = new ZapretConnectivityTargetResult(discord,
+    [
+        new ZapretCurlProbeResult("HTTP", ZapretCurlProbeStatus.Success, 404, null),
+        new ZapretCurlProbeResult("TLS1.2", ZapretCurlProbeStatus.Error, null, "timeout"),
+        new ZapretCurlProbeResult("TLS1.3", ZapretCurlProbeStatus.Unsupported, null, "not supported")
+    ], true, 12);
+    var summary = ZapretConnectivityTester.Summarize([targetResult]);
+    if (summary.HttpPassed != 1 || summary.HttpTotal != 3 || summary.PingPassed != 1 || summary.PingTotal != 1 ||
+        summary.Groups["Discord"].HttpPassed != 1)
+        throw new InvalidOperationException("Zapret test scoring no longer counts curl exit success and ping results like the original tester.");
 }
 
 static void CheckBackupIsIdempotent()

@@ -343,26 +343,44 @@
                 </Grid>
                 <TextBlock x:Name="ZapretHealthStatusText" Text="Проверка стратегий ещё не выполнялась." Foreground="{StaticResource MutedBrush}"
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
-                <TextBlock x:Name="ZapretTestStrategyText" Text="Первая стратегия с доступом ко всем сайтам будет рекомендована. Работающую службу NetShift проверка не прерывает."
+                <TextBlock x:Name="ZapretTestStrategyText" Text="Сверка по targets.txt: три curl пробы и ping для каждой цели. Автоперебор запускает оригинальные general*.bat; подготовка может включить TCP timestamps. Активную службу тестирую без остановки."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8" />
                 <ProgressBar x:Name="ZapretTestProgressBar" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
                 <UniformGrid Columns="3">
                   <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,6,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <Ellipse x:Name="DiscordTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                      <StackPanel><TextBlock Text="Discord" FontWeight="SemiBold"/><TextBlock x:Name="DiscordTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                      <StackPanel><TextBlock Text="Discord" FontWeight="SemiBold"/><TextBlock x:Name="DiscordTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
                     </StackPanel>
                   </Border>
                   <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="3,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <Ellipse x:Name="YouTubeTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                      <StackPanel><TextBlock Text="YouTube" FontWeight="SemiBold"/><TextBlock x:Name="YouTubeTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                      <StackPanel><TextBlock Text="YouTube" FontWeight="SemiBold"/><TextBlock x:Name="YouTubeTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
                     </StackPanel>
                   </Border>
                   <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="6,0,0,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <Ellipse x:Name="GoogleTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
-                      <StackPanel><TextBlock Text="Google" FontWeight="SemiBold"/><TextBlock x:Name="GoogleTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="11" /></StackPanel>
+                      <StackPanel><TextBlock Text="Google" FontWeight="SemiBold"/><TextBlock x:Name="GoogleTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,6,6,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="CloudflareTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="Cloudflare" FontWeight="SemiBold"/><TextBlock x:Name="CloudflareTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="3,6,3,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="DnsTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="DNS" FontWeight="SemiBold"/><TextBlock x:Name="DnsTestStatusText" Text="Не проверялся" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource PanelRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9" Margin="6,6,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="OtherTestIndicator" Width="9" Height="9" Fill="#718096" Margin="0,0,8,0" />
+                      <StackPanel><TextBlock Text="Другие цели" FontWeight="SemiBold"/><TextBlock x:Name="OtherTestStatusText" Text="Не проверялись" Foreground="{StaticResource MutedBrush}" FontSize="10" /></StackPanel>
                     </StackPanel>
                   </Border>
                 </UniformGrid>

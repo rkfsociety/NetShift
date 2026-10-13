@@ -1264,44 +1264,38 @@ public partial class MainWindow : Window
         UpdateZapretInventory();
         CheckActiveStrategyButton.IsEnabled = false;
         var displayStrategyName = Path.GetFileNameWithoutExtension(activeStrategyPath);
-        ZapretHealthStatusText.Text = $"Проверяю доступность Discord, YouTube и Google через {displayStrategyName}…";
+        ZapretHealthStatusText.Text = $"Проверяю цели из targets.txt через {displayStrategyName}…";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Проверка выполняется";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-        ZapretTestStrategyText.Text = $"Активная служба: проверяю {displayStrategyName}. Её работа не прерывается.";
+        ZapretTestStrategyText.Text = $"Активная служба: {displayStrategyName}. Тестирую HTTP/1.1, TLS 1.2, TLS 1.3 и ping; службу не прерываю.";
         ZapretTestProgressBar.Visibility = Visibility.Visible;
-        SetZapretTargetStatus("Discord", "Ожидает", System.Windows.Media.Brushes.Gray);
-        SetZapretTargetStatus("YouTube", "Ожидает", System.Windows.Media.Brushes.Gray);
-        SetZapretTargetStatus("Google", "Ожидает", System.Windows.Media.Brushes.Gray);
+        ResetZapretTargetStatuses("Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
         try
         {
-            (string Name, string Url)[] targets =
-            [
-                ("Discord", "https://discord.com"),
-                ("YouTube", "https://www.youtube.com"),
-                ("Google", "https://www.google.com")
-            ];
-            var results = new List<(string Name, bool Reachable)>(targets.Length);
-            foreach (var target in targets)
-            {
-                SetZapretTargetStatus(target.Name, "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
-                results.Add(await ProbeZapretTargetWithStatusAsync(target.Name, target.Url));
-            }
-            var healthy = results.All(result => result.Reachable);
+            ZapretConnectivityTester.EnsureCurlAvailable();
+            var targets = ZapretConnectivityTester.LoadTargets(Path.GetDirectoryName(activeStrategyPath)!);
+            var result = await ZapretConnectivityTester.CheckTargetsAsync(targets);
+            var healthy = result.HttpTotal > 0 && result.HttpPassed == result.HttpTotal && result.PingPassed == result.PingTotal;
+            SetZapretTargetStatuses(result.Groups);
+            _settings.ZapretStrategyHealth.Clear();
             _settings.ZapretStrategyHealth[HealthKey(activeStrategyPath)] = healthy;
-            _settings.RecommendedZapretStrategyPath = healthy ? Path.GetFullPath(activeStrategyPath) : null;
+            _settings.RecommendedZapretStrategyPath = Path.GetFullPath(activeStrategyPath);
             if (isInitialCheck) _settings.InitialZapretStrategyCheckCompleted = true;
             SaveSettings();
             UpdateZapretInventory();
 
-            var passed = results.Where(result => result.Reachable).Select(result => result.Name).ToArray();
-            var failed = results.Where(result => !result.Reachable).Select(result => result.Name).ToArray();
-            ZapretHealthStatusText.Text = failed.Length == 0
-                ? $"Все адреса доступны через {displayStrategyName}. Стратегия отмечена как рекомендуемая."
-                : $"{displayStrategyName}: доступны {string.Join(", ", passed)}; нет ответа от {string.Join(", ", failed)}.";
-            ZapretHealthStatusText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
-            ZapretTestPhaseText.Text = healthy ? "Все сайты доступны" : "Есть недоступные сайты";
-            ZapretTestPhaseText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
+            ZapretHealthStatusText.Text = $"{displayStrategyName}: HTTP/TLS {result.HttpPassed}/{result.HttpTotal}; ping {result.PingPassed}/{result.PingTotal}.";
+            var hasAnySuccess = result.HttpPassed + result.PingPassed > 0;
+            ZapretHealthStatusText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen
+                : hasAnySuccess ? System.Windows.Media.Brushes.Goldenrod
+                : System.Windows.Media.Brushes.IndianRed;
+            ZapretTestPhaseText.Text = healthy ? "Все проверки пройдены"
+                : hasAnySuccess ? "Есть успешные проверки"
+                : "Нет успешных проверок";
+            ZapretTestPhaseText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen
+                : hasAnySuccess ? System.Windows.Media.Brushes.Goldenrod
+                : System.Windows.Media.Brushes.IndianRed;
         }
         catch (Exception error)
         {
@@ -1339,15 +1333,13 @@ public partial class MainWindow : Window
         ZapretServiceToggle.IsEnabled = false;
         ServiceRunButton.IsEnabled = false;
         ApplyServiceStrategyButton.IsEnabled = false;
-        ZapretHealthStatusText.Text = $"Проверяю стратегии по порядку: 0 из {strategyPaths.Length}.";
+        ZapretHealthStatusText.Text = $"Проверяю все стратегии: 0 из {strategyPaths.Length}.";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Подготовка";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-        ZapretTestStrategyText.Text = "Стратегии и сайты проверяются по очереди; каждый вариант запускается отдельно и останавливается после проверки. Служба Windows не изменяется.";
+        ZapretTestStrategyText.Text = "Оригинальные general*.bat запускаются по очереди и останавливаются после проверки. Служба Windows не меняется.";
         ZapretTestProgressBar.Visibility = Visibility.Visible;
-        SetZapretTargetStatus("Discord", "Ожидает", System.Windows.Media.Brushes.Gray);
-        SetZapretTargetStatus("YouTube", "Ожидает", System.Windows.Media.Brushes.Gray);
-        SetZapretTargetStatus("Google", "Ожидает", System.Windows.Media.Brushes.Gray);
+        ResetZapretTargetStatuses("Ожидает", System.Windows.Media.Brushes.Gray);
 
         try
         {
@@ -1415,47 +1407,44 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Text = progress.Phase switch
         {
             "starting" => "Запуск стратегии",
-            "checking" => "Проверка сайтов",
+            "checking" => "HTTP/TLS и ping",
             "failed" => "Не прошла",
-            "recommended" => "Рекомендация найдена",
+            "scored" => "Результат получен",
             "completed" => progress.RecommendedPath is null ? "Подходящая не найдена" : "Проверка завершена",
             _ => progress.Phase
         };
         ZapretTestPhaseText.Foreground = progress.Phase switch
         {
             "checking" or "starting" => System.Windows.Media.Brushes.DodgerBlue,
-            "recommended" => System.Windows.Media.Brushes.LightGreen,
             "failed" => System.Windows.Media.Brushes.IndianRed,
-            "completed" => progress.RecommendedPath is null ? System.Windows.Media.Brushes.IndianRed : System.Windows.Media.Brushes.LightGreen,
+            "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
+            "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
+            "completed" => System.Windows.Media.Brushes.Goldenrod,
             _ => (System.Windows.Media.Brush)FindResource("MutedBrush")
         };
         ZapretHealthStatusText.Text = progress.Message;
         ZapretHealthStatusText.Foreground = progress.Phase switch
         {
-            "recommended" => System.Windows.Media.Brushes.LightGreen,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
+            "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
+            "completed" => System.Windows.Media.Brushes.Goldenrod,
             "failed" when progress.Completed => System.Windows.Media.Brushes.IndianRed,
             _ => (System.Windows.Media.Brush)FindResource("MutedBrush")
         };
         ZapretTestStrategyText.Text = progress.StrategyPath is null
-            ? $"Проверено {progress.StrategyIndex} из {progress.StrategyCount}. Служба Windows не изменяется."
+            ? $"Проверено {progress.StrategyIndex} из {progress.StrategyCount}. Служба Windows не меняется."
             : $"{Path.GetFileNameWithoutExtension(progress.StrategyPath)} · вариант {progress.StrategyIndex} из {progress.StrategyCount}.";
         ZapretTestProgressBar.Visibility = progress.Completed ? Visibility.Collapsed : Visibility.Visible;
 
-        foreach (var target in new[] { "Discord", "YouTube", "Google" })
-        {
-            var hasResult = progress.Targets.TryGetValue(target, out var reachable) && reachable.HasValue;
-            var status = hasResult ? reachable == true ? "Доступен" : "Нет ответа"
-                : progress.Phase == "checking" ? "Проверяется…" : "Ожидает";
-            var color = hasResult ? reachable == true ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed
-                : progress.Phase == "checking" ? System.Windows.Media.Brushes.DodgerBlue : System.Windows.Media.Brushes.Gray;
-            SetZapretTargetStatus(target, status, color);
-        }
+        var pendingStatus = progress.Phase == "checking" ? "Проверяется…" : progress.Phase == "failed" ? "Не проверено" : "Ожидает";
+        SetZapretTargetStatuses(progress.Groups, pendingStatus);
 
         var healthChanged = false;
-        if (progress.StrategyPath is not null && (progress.Phase is "failed" or "recommended"))
+        if (progress.StrategyPath is not null && (progress.Phase is "failed" or "scored"))
         {
-            _settings.ZapretStrategyHealth[HealthKey(progress.StrategyPath)] = progress.Phase == "recommended";
+            var healthy = progress.Phase == "scored" && progress.HttpTotal > 0 &&
+                progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal;
+            _settings.ZapretStrategyHealth[HealthKey(progress.StrategyPath)] = healthy;
             healthChanged = true;
         }
         if (_settings.RecommendedZapretStrategyPath != progress.RecommendedPath)
@@ -1480,21 +1469,35 @@ public partial class MainWindow : Window
         catch { return null; }
     }
 
-    private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
-
-    private static async Task<(string Name, bool Reachable)> ProbeZapretTargetAsync(string name, string url)
+    private void ResetZapretTargetStatuses(string status, System.Windows.Media.Brush color)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(7) };
-        try
+        foreach (var target in new[] { "Discord", "YouTube", "Google", "Cloudflare", "DNS", "Other" })
+            SetZapretTargetStatus(target, status, color);
+    }
+
+    private void SetZapretTargetStatuses(IReadOnlyDictionary<string, ZapretTestGroupSummary> groups, string pendingStatus = "Ожидает")
+    {
+        foreach (var target in new[] { "Discord", "YouTube", "Google", "Cloudflare", "DNS", "Other" })
         {
-            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-            return (name, true);
-        }
-        catch
-        {
-            return (name, false);
+            if (!groups.TryGetValue(target, out var summary) || summary.HttpTotal + summary.PingTotal == 0)
+            {
+                SetZapretTargetStatus(target, pendingStatus, pendingStatus == "Проверяется…"
+                    ? System.Windows.Media.Brushes.DodgerBlue
+                    : System.Windows.Media.Brushes.Gray);
+                continue;
+            }
+
+            var hasAnySuccess = summary.HttpPassed + summary.PingPassed > 0;
+            var allPassed = summary.HttpPassed == summary.HttpTotal && summary.PingPassed == summary.PingTotal;
+            var color = allPassed ? System.Windows.Media.Brushes.LightGreen
+                : hasAnySuccess ? System.Windows.Media.Brushes.Goldenrod
+                : System.Windows.Media.Brushes.IndianRed;
+            SetZapretTargetStatus(target,
+                $"{summary.HttpPassed}/{summary.HttpTotal} HTTP · {summary.PingPassed}/{summary.PingTotal} ping", color);
         }
     }
+
+    private static string HealthKey(string path) => Path.GetFullPath(path).ToUpperInvariant();
 
     private void ToggleZapretAdvanced_Click(object sender, RoutedEventArgs e)
     {
@@ -1864,8 +1867,8 @@ public partial class MainWindow : Window
     private sealed record StrategyItem(string Name, string Path, bool? IsHealthy, bool IsRecommended)
     {
         public Visibility HealthVisibility => IsHealthy.HasValue ? Visibility.Visible : Visibility.Collapsed;
-        public System.Windows.Media.Brush HealthBrush => IsHealthy == true ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
-        public string HealthTooltip => IsRecommended ? "Рекомендуется: все проверки пройдены" : IsHealthy == true ? "Все проверки пройдены" : "Проверка не пройдена";
+        public System.Windows.Media.Brush HealthBrush => IsRecommended || IsHealthy == true ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
+        public string HealthTooltip => IsRecommended ? "Лучшая стратегия по числу успешных HTTP/TLS проверок и ping" : IsHealthy == true ? "Все проверки пройдены" : "Есть неуспешные HTTP/TLS проверки или ping";
         public override string ToString() => Name;
     }
 }

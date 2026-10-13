@@ -9,6 +9,8 @@
     <Compile Include="..\..\src\NetShift.App\Services\LegacyDnsScriptFragments.cs" Link="LegacyDnsScriptFragments.cs" />
     <Compile Include="..\..\src\NetShift.App\Services\ProcessExecutionService.cs" Link="ProcessExecutionService.cs" />
     <Compile Include="..\..\src\NetShift.App\Services\NetShiftUpdateService.cs" Link="NetShiftUpdateService.cs" />
+    <Compile Include="..\..\src\NetShift.App\Services\ZapretConnectivityTester.cs" Link="ZapretConnectivityTester.cs" />
     <Compile Include="..\..\src\NetShift.App\Models\DnsProvider.cs" Link="DnsProvider.cs" />
+    <Compile Include="..\..\src\NetShift.App\Models\ZapretTestProgress.cs" Link="ZapretTestProgress.cs" />
   </ItemGroup>
 </Project>
