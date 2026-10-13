@@ -137,8 +137,7 @@
                       <TextBlock Text="Адаптер" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" />
                       <Button Content="Обновить список" Click="RefreshAdapters_Click" DockPanel.Dock="Right" Padding="10,5" MinHeight="34" />
                     </DockPanel>
-                    <ComboBox x:Name="AdapterComboBox" SelectionChanged="AdapterComboBox_SelectionChanged" MinHeight="46" FontSize="16" />
-                    <TextBlock x:Name="CurrentDnsText" Text="Текущие DNS: загрузка…" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="4,8,0,0" />
+                    <ComboBox x:Name="AdapterComboBox" MinHeight="46" FontSize="16" />
                   </StackPanel>
                   <Border Grid.Column="1" Width="1" Background="{StaticResource BorderBrush}" HorizontalAlignment="Center" Margin="0,4" />
                   <StackPanel Grid.Column="2">
@@ -147,8 +146,6 @@
                       <Button x:Name="RefreshDnsAiButton" Content="Обновить DNS-AI" Click="RefreshDnsAi_Click" DockPanel.Dock="Right" Padding="10,5" MinHeight="34" />
                     </DockPanel>
                     <ComboBox x:Name="ProviderComboBox" DisplayMemberPath="Name" SelectionChanged="ProviderComboBox_SelectionChanged" MinHeight="46" FontSize="16" />
-                    <TextBlock x:Name="DnsProviderStatusText" Text="DNS-AI: загружаются актуальные настройки сайта…"
-                               Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="4,8,0,0" />
                   </StackPanel>
                 </Grid>
 

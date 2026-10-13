@@ -273,8 +273,6 @@ public partial class MainWindow : Window
         AdapterComboBox.ItemsSource = _adapters;
         var selected = _adapters.FirstOrDefault(adapter => adapter.InterfaceIndex == selectedIndex);
         AdapterComboBox.SelectedItem = selected ?? (selectFirst ? _adapters.FirstOrDefault() : null);
-        if (AdapterComboBox.SelectedItem is null)
-            CurrentDnsText.Text = _adapters.Count == 0 ? "Сетевые адаптеры не найдены." : "Выберите адаптер, чтобы увидеть текущие DNS.";
     }
 
     private void RefreshZapretFolder()
@@ -565,13 +563,6 @@ public partial class MainWindow : Window
     }
 
     private void SetZapretStatus(string text) => ZapretStatusText.Text = text;
-
-    private void AdapterComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-    {
-        if (CurrentDnsText is null) return;
-        if (AdapterComboBox.SelectedItem is NetworkAdapterInfo adapter)
-            CurrentDnsText.Text = $"Текущие DNS: {adapter.DnsSummary}";
-    }
 
     private void ProviderComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
@@ -873,7 +864,6 @@ public partial class MainWindow : Window
     private async Task RefreshDnsAiProviderAsync(bool showError)
     {
         RefreshDnsAiButton.IsEnabled = false;
-        DnsProviderStatusText.Text = "DNS-AI: запрашиваю актуальные настройки сайта…";
         try
         {
             var updatedProvider = await DnsAiProviderService.GetCurrentAsync();
@@ -883,11 +873,9 @@ public partial class MainWindow : Window
             var wasSelected = ProviderComboBox.SelectedItem is DnsProvider selected && selected.Name.Equals("DNS-AI", StringComparison.OrdinalIgnoreCase);
             _dnsProviders[providerIndex] = updatedProvider;
             if (wasSelected) ProviderComboBox.SelectedItem = updatedProvider;
-            DnsProviderStatusText.Text = $"DNS-AI: настройки обновлены с dns-ai.ru · {DateTime.Now:dd.MM.yyyy HH:mm}";
         }
         catch (Exception error)
         {
-            DnsProviderStatusText.Text = "DNS-AI: сайт недоступен; используются встроенные резервные значения.";
             if (showError)
                 ThemedDialog.Show(this, $"Не удалось обновить данные DNS-AI. Используются резервные значения.\n\n{error.Message}",
                     "DNS-AI", MessageBoxButton.OK, MessageBoxImage.Warning);

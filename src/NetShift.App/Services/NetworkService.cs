@@ -27,18 +27,12 @@ public static class NetworkService
                 if (interfaceIndex is null or <= 0)
                     continue;
 
-                var dns = properties.DnsAddresses
-                    .Select(address => address.ToString())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-
                 adapters.Add(new NetworkAdapterInfo
                 {
                     Name = adapter.Name,
                     Description = adapter.Description,
                     Status = adapter.OperationalStatus == OperationalStatus.Up ? "Подключён" : "Отключён",
                     InterfaceIndex = interfaceIndex.Value,
-                    DnsSummary = dns.Length == 0 ? "DNS не назначен" : string.Join("  ·  ", dns),
                     IsVpn = isVpn
                 });
             }
