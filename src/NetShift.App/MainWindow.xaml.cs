@@ -406,6 +406,7 @@ public partial class MainWindow : Window
     private async Task RefreshServiceStatusAsync()
     {
         if (ServiceStatusText is null) return;
+        RefreshManualStrategyStatus();
         var output = await QueryWindowsServiceAsync("zapret");
         if (output is null)
         {
@@ -448,6 +449,40 @@ public partial class MainWindow : Window
             StopServiceButton.IsEnabled = false;
             RemoveServiceButton.IsEnabled = false;
         }
+    }
+
+    private void RefreshManualStrategyStatus()
+    {
+        var strategies = Process.GetProcessesByName("winws")
+            .Select(process =>
+            {
+                using (process)
+                {
+                    try
+                    {
+                        const string titlePrefix = "zapret: ";
+                        var title = process.MainWindowTitle.Trim();
+                        return title.StartsWith(titlePrefix, StringComparison.OrdinalIgnoreCase)
+                            ? title[titlePrefix.Length..]
+                            : null;
+                    }
+                    catch (InvalidOperationException) { return null; }
+                    catch (System.ComponentModel.Win32Exception) { return null; }
+                }
+            })
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (strategies.Length == 0)
+        {
+            ManualStrategyStatusText.Text = "Ручной запуск стратегии: не активен";
+            ManualStrategyStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+            return;
+        }
+
+        ManualStrategyStatusText.Text = $"Ручная стратегия работает: {string.Join(", ", strategies)}";
+        ManualStrategyStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
     }
 
     private static async Task<string?> QueryWindowsServiceAsync(string serviceName)
@@ -1009,8 +1044,8 @@ public partial class MainWindow : Window
         var confirmation = MessageBox.Show(this,
             "Остановить winws.exe, запущенный из выбранной папки? Зарегистрированная служба Windows этим действием не удаляется.",
             "Остановить ручной запуск", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-        if (confirmation == MessageBoxResult.OK)
-            await RunElevatedWorkerAsync("zapret-stop", folder);
+        if (confirmation == MessageBoxResult.OK && await RunElevatedWorkerAsync("zapret-stop", folder))
+            await RefreshServiceStatusAsync();
     }
 
     private async void InstallService_Click(object sender, RoutedEventArgs e)

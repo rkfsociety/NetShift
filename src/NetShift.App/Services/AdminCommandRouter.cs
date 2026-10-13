@@ -242,19 +242,51 @@ public static class AdminCommandRouter
 
     private static void StartBatch(string scriptPath)
     {
+        var executablePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(scriptPath)!, "bin", "winws.exe"));
+        if (IsZapretProcessRunning(executablePath)) return;
+
         var startInfo = new ProcessStartInfo("cmd.exe")
         {
             WorkingDirectory = Path.GetDirectoryName(scriptPath)!,
             UseShellExecute = false,
-            CreateNoWindow = false
+            CreateNoWindow = true
         };
         startInfo.Environment["NO_UPDATE_CHECK"] = "1";
         startInfo.ArgumentList.Add("/d");
         startInfo.ArgumentList.Add("/s");
         startInfo.ArgumentList.Add("/c");
         startInfo.ArgumentList.Add($"\"\"{scriptPath}\"\"");
-        if (Process.Start(startInfo) is null)
-            throw new InvalidOperationException("Не удалось запустить командный файл.");
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить командный файл.");
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            if (IsZapretProcessRunning(executablePath)) return;
+            if (process.HasExited && attempt > 10) break;
+            Thread.Sleep(100);
+        }
+
+        var exitCode = process.HasExited ? $" Код завершения сценария: {process.ExitCode}." : string.Empty;
+        throw new InvalidOperationException("Сценарий завершился, но winws.exe из выбранного пакета не запущен." + exitCode +
+            " Проверьте пакет zapret и повторите запуск.");
+    }
+
+    private static bool IsZapretProcessRunning(string executablePath)
+    {
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            using (process)
+            {
+                try
+                {
+                    var runningPath = process.MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(runningPath) &&
+                        Path.GetFullPath(runningPath).Equals(executablePath, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch (System.ComponentModel.Win32Exception) { }
+                catch (InvalidOperationException) { }
+            }
+        }
+        return false;
     }
 
     private static string QuoteWindowsArgument(string value)
