@@ -304,15 +304,14 @@ public partial class MainWindow : Window
     {
         var strategies = RefreshStrategyItems();
         var folder = ZapretFolderTextBox.Text.Trim();
-        var version = ReadZapretVersion(folder);
         var hasService = File.Exists(Path.Combine(folder, "service.bat"));
         var valid = hasService && strategies.Length > 0;
         var pathWarning = folder.Any(character => character > 127 || char.IsWhiteSpace(character))
-            ? " · проверьте путь: upstream рекомендует папку без кириллицы и пробелов"
+            ? "Для стабильной работы выберите путь без кириллицы и пробелов."
             : string.Empty;
         SetZapretStatus(valid
-            ? $"Пакет готов{(version is null ? string.Empty : $" · версия {version}")} · стратегий: {strategies.Length}{pathWarning}"
-            : "В этой папке не найдены service.bat и general*.bat.");
+            ? pathWarning
+            : "Пакет zapret не найден или неполный.");
         StartStrategyButton.IsEnabled = valid && StrategyComboBox.SelectedItem is not null && !_isZapretStrategyTestRunning;
         StopStrategyButton.IsEnabled = valid && !_isZapretStrategyTestRunning;
         ZapretServiceToggle.IsEnabled = valid && !_isZapretStrategyTestRunning && !_isZapretServiceActionRunning;
@@ -582,7 +581,11 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void SetZapretStatus(string text) => ZapretStatusText.Text = text;
+    private void SetZapretStatus(string text)
+    {
+        ZapretStatusText.Text = text;
+        ZapretStatusText.Visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
+    }
 
     private void ProviderComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
