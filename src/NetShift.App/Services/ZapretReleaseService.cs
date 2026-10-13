@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -8,6 +9,7 @@ namespace NetShift.App.Services;
 
 public sealed record ZapretRelease(string Tag, string Version, string ArchivePath, string Sha256);
 public sealed record ZapretReleaseInfo(string Tag, string Version);
+internal sealed record ZapretReleaseDownloadInfo(string Tag, string Version, Uri DownloadUrl, long ExpectedBytes, string ExpectedSha256);
 
 public static class ZapretReleaseService
 {
@@ -27,6 +29,12 @@ public static class ZapretReleaseService
     }
 
     public static async Task<ZapretRelease> DownloadLatestAsync(IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var release = await GetLatestReleaseDownloadInfoAsync(cancellationToken);
+        return await DownloadLatestAsync(release, progress, cancellationToken);
+    }
+
+    internal static async Task<ZapretReleaseDownloadInfo> GetLatestReleaseDownloadInfoAsync(CancellationToken cancellationToken)
     {
         using var metadataResponse = await Client.GetAsync(LatestApiUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         metadataResponse.EnsureSuccessStatusCode();
@@ -72,11 +80,22 @@ public static class ZapretReleaseService
         if (expectedBytes <= 0 || expectedBytes > MaxArchiveBytes)
             throw new InvalidDataException("Размер архива в GitHub API некорректен или превышает 100 МБ.");
 
+        return new ZapretReleaseDownloadInfo(tag, tag.TrimStart('v', 'V'), downloadUrl, expectedBytes, digestMatch.Groups[1].Value);
+    }
+
+    internal static async Task<ZapretRelease> DownloadLatestAsync(
+        ZapretReleaseDownloadInfo release, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var tag = release.Tag;
+        var downloadUrl = release.DownloadUrl;
+        var expectedBytes = release.ExpectedBytes;
+
         var cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "Downloads");
         Directory.CreateDirectory(cacheDirectory);
         var archivePath = Path.Combine(cacheDirectory, $"{tag}-{Guid.NewGuid():N}.zip");
         try
         {
+            string actualHash;
             using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
             using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -87,6 +106,8 @@ public static class ZapretReleaseService
             await using (var output = new FileStream(archivePath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
             {
                 var buffer = new byte[81920];
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var lastProgressTimestamp = Stopwatch.GetTimestamp();
                 long total = 0;
                 int read;
                 while ((read = await input.ReadAsync(buffer, cancellationToken)) != 0)
@@ -94,20 +115,23 @@ public static class ZapretReleaseService
                     total += read;
                     if (total > MaxArchiveBytes || total > expectedBytes)
                         throw new InvalidDataException("Загруженный архив больше размера, объявленного GitHub.");
+                    hash.AppendData(buffer, 0, read);
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    progress?.Report(Math.Min(99, total * 100d / expectedBytes));
+                    if (Stopwatch.GetElapsedTime(lastProgressTimestamp) >= TimeSpan.FromMilliseconds(100))
+                    {
+                        lastProgressTimestamp = Stopwatch.GetTimestamp();
+                        progress?.Report(Math.Min(99, total * 100d / expectedBytes));
+                    }
                 }
                 if (total != expectedBytes)
                     throw new InvalidDataException("Размер загруженного архива не совпадает с размером в GitHub API.");
+                actualHash = Convert.ToHexString(hash.GetHashAndReset());
+                if (!actualHash.Equals(release.ExpectedSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("SHA-256 архива не совпал с контрольной суммой GitHub.");
             }
 
-            await using var archiveStream = File.OpenRead(archivePath);
-            var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(archiveStream, cancellationToken));
-            if (!actualHash.Equals(digestMatch.Groups[1].Value, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("SHA-256 архива не совпал с контрольной суммой GitHub.");
-
             progress?.Report(100);
-            return new ZapretRelease(tag, tag.TrimStart('v', 'V'), archivePath, actualHash);
+            return new ZapretRelease(tag, release.Version, archivePath, actualHash);
         }
         catch
         {
@@ -124,6 +148,8 @@ public static class ZapretReleaseService
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         var root = document.RootElement;
         var tag = RequiredString(root, "tag_name");
+        if (!Regex.IsMatch(tag, "^[A-Za-z0-9._-]{1,64}$", RegexOptions.CultureInvariant))
+            throw new InvalidDataException("GitHub вернул некорректный тег релиза.");
         var releaseUrl = RequiredString(root, "html_url");
         var uri = new Uri(releaseUrl);
         if (uri.Scheme != Uri.UriSchemeHttps || uri.Host != "github.com" ||
@@ -140,10 +166,27 @@ public static class ZapretReleaseService
 
     private static async Task<string> DownloadOfficialTextAsync(string url, int maxBytes, CancellationToken cancellationToken)
     {
-        var bytes = await Client.GetByteArrayAsync(url, cancellationToken);
-        if (bytes.Length == 0 || bytes.Length > maxBytes)
+        using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        if (response.Content.Headers.ContentLength is long contentLength && contentLength > maxBytes)
             throw new InvalidDataException("Файл со списком пуст или превышает допустимый размер.");
-        var content = new System.Text.UTF8Encoding(false, true).GetString(bytes);
+
+        await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var output = new MemoryStream(response.Content.Headers.ContentLength is long length ? (int)length : 0);
+        var buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await input.ReadAsync(buffer, cancellationToken)) != 0)
+        {
+            total += read;
+            if (total > maxBytes)
+                throw new InvalidDataException("Файл со списком пуст или превышает допустимый размер.");
+            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        if (total == 0)
+            throw new InvalidDataException("Файл со списком пуст или превышает допустимый размер.");
+        var content = new System.Text.UTF8Encoding(false, true).GetString(output.GetBuffer(), 0, (int)output.Length);
         if (content.Contains("<html", StringComparison.OrdinalIgnoreCase) || content.Contains("404: Not Found", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("GitHub вернул страницу ошибки вместо файла списка.");
         return content;

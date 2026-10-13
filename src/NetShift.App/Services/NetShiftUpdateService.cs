@@ -182,6 +182,8 @@ public static class NetShiftUpdateService
             await using (var output = new FileStream(temporaryArchivePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
             {
                 var buffer = new byte[81920];
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var lastProgressTimestamp = Stopwatch.GetTimestamp();
                 long total = 0;
                 int read;
                 while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
@@ -189,16 +191,17 @@ public static class NetShiftUpdateService
                     total += read;
                     if (total > MaxArchiveBytes || total > update.ArchiveSize)
                         throw new InvalidDataException("Загруженный ZIP-архив превышает объявленный размер.");
+                    hash.AppendData(buffer, 0, read);
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    progress?.Report((double)total / update.ArchiveSize);
+                    if (Stopwatch.GetElapsedTime(lastProgressTimestamp) >= TimeSpan.FromMilliseconds(100))
+                    {
+                        lastProgressTimestamp = Stopwatch.GetTimestamp();
+                        progress?.Report((double)total / update.ArchiveSize);
+                    }
                 }
                 if (total != update.ArchiveSize)
                     throw new InvalidDataException("Загруженный ZIP-архив имеет неполный размер.");
-            }
-
-            await using (var archiveStream = File.OpenRead(temporaryArchivePath))
-            {
-                var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(archiveStream, cancellationToken));
+                var actualHash = Convert.ToHexString(hash.GetHashAndReset());
                 if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("SHA-256 загруженного ZIP-архива NetShift не совпал.");
             }

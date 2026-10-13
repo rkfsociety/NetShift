@@ -21,6 +21,7 @@ namespace NetShift.App;
 
 public partial class MainWindow : Window
 {
+    private static readonly JsonSerializerOptions ZapretProgressJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly string _settingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "settings.json");
     private readonly ObservableCollection<DnsProvider> _dnsProviders = new(DnsProvider.Presets);
@@ -310,24 +311,8 @@ public partial class MainWindow : Window
 
     private void UpdateZapretInventory()
     {
+        var strategies = RefreshStrategyItems();
         var folder = ZapretFolderTextBox.Text.Trim();
-        var strategies = Directory.Exists(folder)
-            ? Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
-                .ToArray()
-            : [];
-
-        var selectedPath = StrategyComboBox.SelectedValue as string;
-        StrategyComboBox.ItemsSource = strategies.Select(path =>
-        {
-            var fullPath = Path.GetFullPath(path);
-            var hasHealth = _settings.ZapretStrategyHealth.TryGetValue(HealthKey(fullPath), out var isHealthy);
-            var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
-            return new StrategyItem(Path.GetFileName(path), fullPath, hasHealth ? isHealthy : null, isRecommended);
-        }).ToArray();
-        StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
-        StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
-
         var version = ReadZapretVersion(folder);
         var hasService = File.Exists(Path.Combine(folder, "service.bat"));
         var valid = hasService && strategies.Length > 0;
@@ -363,6 +348,28 @@ public partial class MainWindow : Window
         RefreshPackageSettings(valid ? folder : string.Empty);
         RefreshFakeFiles(valid ? folder : string.Empty);
         _ = RefreshServiceStatusAsync();
+    }
+
+    private string[] RefreshStrategyItems()
+    {
+        var folder = ZapretFolderTextBox.Text.Trim();
+        var strategies = Directory.Exists(folder)
+            ? Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
+                .ToArray()
+            : [];
+
+        var selectedPath = StrategyComboBox.SelectedValue as string;
+        StrategyComboBox.ItemsSource = strategies.Select(path =>
+        {
+            var fullPath = Path.GetFullPath(path);
+            var hasHealth = _settings.ZapretStrategyHealth.TryGetValue(HealthKey(fullPath), out var isHealthy);
+            var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
+            return new StrategyItem(Path.GetFileName(path), fullPath, hasHealth ? isHealthy : null, isRecommended);
+        }).ToArray();
+        StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
+        StrategyComboBox.SelectedValue = strategies.FirstOrDefault(path => path == selectedPath) ?? strategies.FirstOrDefault();
+        return strategies;
     }
 
     private void RefreshPackageSettings(string folder)
@@ -1294,8 +1301,8 @@ public partial class MainWindow : Window
             var testTask = RunElevatedWorkerAsync("zapret-test-strategies", folder, progressPath);
             while (!testTask.IsCompleted)
             {
-                ApplyZapretTestProgress(progressPath);
-                await Task.Delay(150);
+                await ApplyZapretTestProgressAsync(progressPath);
+                await Task.Delay(250);
             }
 
             if (!await testTask)
@@ -1306,7 +1313,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            ApplyZapretTestProgress(progressPath);
+            await ApplyZapretTestProgressAsync(progressPath);
             if (!string.IsNullOrWhiteSpace(_settings.RecommendedZapretStrategyPath))
             {
                 if (isInitialCheck) _settings.InitialZapretStrategyCheckCompleted = true;
@@ -1314,7 +1321,7 @@ public partial class MainWindow : Window
             }
             else if (File.Exists(progressPath))
             {
-                var finalProgress = ReadZapretTestProgress(progressPath);
+                var finalProgress = await ReadZapretTestProgressAsync(progressPath);
                 if (finalProgress?.Completed == true && isInitialCheck)
                 {
                     _settings.InitialZapretStrategyCheckCompleted = true;
@@ -1333,23 +1340,22 @@ public partial class MainWindow : Window
             _isZapretStrategyTestRunning = false;
             ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             UpdateZapretInventory();
-            await RefreshServiceStatusAsync();
             try { File.Delete(progressPath); } catch { }
             try { File.Delete(progressPath + ".tmp"); } catch { }
         }
     }
 
-    private void ApplyZapretTestProgress(string progressPath)
+    private async Task ApplyZapretTestProgressAsync(string progressPath)
     {
-        var json = string.Empty;
-        try { json = File.ReadAllText(progressPath, Encoding.UTF8); }
+        string json;
+        try { json = await File.ReadAllTextAsync(progressPath, Encoding.UTF8); }
         catch (IOException) { return; }
         catch (UnauthorizedAccessException) { return; }
         if (json.Length == 0 || json == _lastZapretTestProgressJson) return;
         _lastZapretTestProgressJson = json;
 
         ZapretTestProgress? progress;
-        try { progress = JsonSerializer.Deserialize<ZapretTestProgress>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }); }
+        try { progress = JsonSerializer.Deserialize<ZapretTestProgress>(json, ZapretProgressJsonOptions); }
         catch (JsonException) { return; }
         if (progress is null) return;
 
@@ -1407,16 +1413,16 @@ public partial class MainWindow : Window
         if (healthChanged)
         {
             SaveSettings();
-            UpdateZapretInventory();
+            RefreshStrategyItems();
         }
     }
 
-    private static ZapretTestProgress? ReadZapretTestProgress(string progressPath)
+    private static async Task<ZapretTestProgress?> ReadZapretTestProgressAsync(string progressPath)
     {
         try
         {
-            return JsonSerializer.Deserialize<ZapretTestProgress>(File.ReadAllText(progressPath, Encoding.UTF8),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var json = await File.ReadAllTextAsync(progressPath, Encoding.UTF8);
+            return JsonSerializer.Deserialize<ZapretTestProgress>(json, ZapretProgressJsonOptions);
         }
         catch { return null; }
     }
@@ -1508,14 +1514,25 @@ public partial class MainWindow : Window
         DownloadProgressBar.Value = 0;
         try
         {
-            DownloadStatusText.Text = "Проверяю последний GitHub-релиз и загружаю ZIP…";
+            DownloadStatusText.Text = "Проверяю последний GitHub-релиз…";
+            var latestRelease = await ZapretReleaseService.GetLatestReleaseDownloadInfoAsync(CancellationToken.None);
+            var latestInstallPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "NetShift", "zapret-" + latestRelease.Version);
+            if (IsCompleteZapretPackage(latestInstallPath))
+            {
+                SelectZapretFolder(latestInstallPath);
+                DownloadStatusText.Text = $"Последний релиз {latestRelease.Tag} уже установлен; выбрана его папка.";
+                if (!_settings.InitialZapretStrategyCheckCompleted)
+                    await CheckZapretStrategiesAsync(isInitialCheck: true);
+                return;
+            }
+
+            DownloadStatusText.Text = "Скачиваю архив последнего релиза…";
             var progress = new Progress<double>(value => DownloadProgressBar.Value = value);
-            var release = await ZapretReleaseService.DownloadLatestAsync(progress, CancellationToken.None);
+            var release = await ZapretReleaseService.DownloadLatestAsync(latestRelease, progress, CancellationToken.None);
             var installPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "NetShift", "zapret-" + release.Version);
             if (Directory.Exists(installPath))
             {
-                if (!File.Exists(Path.Combine(installPath, "service.bat")) || !File.Exists(Path.Combine(installPath, "bin", "winws.exe")) ||
-                    !Directory.EnumerateFiles(installPath, "general*.bat", SearchOption.TopDirectoryOnly).Any())
+                if (!IsCompleteZapretPackage(installPath))
                     throw new InvalidDataException($"Папка {installPath} уже существует, но пакет неполный. Архив сохранён; выберите другой путь или исправьте папку.");
                 File.Delete(release.ArchivePath);
                 SelectZapretFolder(installPath);
@@ -1547,6 +1564,12 @@ public partial class MainWindow : Window
             DownloadProgressBar.Visibility = Visibility.Collapsed;
         }
     }
+
+    private static bool IsCompleteZapretPackage(string folder) =>
+        Directory.Exists(folder) &&
+        File.Exists(Path.Combine(folder, "service.bat")) &&
+        File.Exists(Path.Combine(folder, "bin", "winws.exe")) &&
+        Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly).Any();
 
     private void SelectZapretFolder(string folder)
     {
