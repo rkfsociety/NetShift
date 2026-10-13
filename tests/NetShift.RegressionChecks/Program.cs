@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using NetShift.App.Models;
 using NetShift.App.Services;
 
+CheckDnsProviderAddressEditing();
 CheckBackupIsIdempotent();
 CheckBackupSurvivesMissingAdapter();
 CheckDnsRestore(true, true, "reset");
@@ -13,6 +15,14 @@ await CheckProcessTimeoutAsync();
 CheckUpdateConfirmation();
 CheckExecutableReleaseMetadata();
 Console.WriteLine("NetShift regression checks passed.");
+
+static void CheckDnsProviderAddressEditing()
+{
+    var addressProviders = DnsProvider.Presets.Where(provider => !provider.RequiresManualAddressInput).ToArray();
+    var manualProviders = DnsProvider.Presets.Where(provider => provider.RequiresManualAddressInput).ToArray();
+    if (addressProviders.Length == 0 || manualProviders.Length != 1 || !manualProviders[0].Name.Equals("Свой DNS", StringComparison.Ordinal))
+        throw new InvalidOperationException("DNS presets and the custom provider no longer select the expected address editor state.");
+}
 
 static void CheckBackupIsIdempotent()
 {

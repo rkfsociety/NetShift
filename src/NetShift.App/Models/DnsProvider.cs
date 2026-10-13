@@ -2,6 +2,8 @@ namespace NetShift.App.Models;
 
 public sealed record DnsProvider(string Name, string Ipv4, string Ipv6, string? DohTemplate = null)
 {
+    public bool RequiresManualAddressInput => string.IsNullOrWhiteSpace(Ipv4) && string.IsNullOrWhiteSpace(Ipv6);
+
     public override string ToString() => Name;
 
     public static DnsProvider DnsAi { get; } = new(

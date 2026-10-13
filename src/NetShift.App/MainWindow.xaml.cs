@@ -575,6 +575,7 @@ public partial class MainWindow : Window
     private void ProviderComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (Ipv4TextBox is null || ProviderComboBox.SelectedItem is not DnsProvider provider) return;
+        DnsAddressSettingsPanel.Visibility = provider.RequiresManualAddressInput ? Visibility.Visible : Visibility.Collapsed;
         _settings.DnsProviderName = provider.Name;
         SaveSettings();
         var ipv4 = SplitAddressPair(provider.Ipv4);

@@ -147,7 +147,7 @@
                   </StackPanel>
                 </Grid>
 
-                <Grid Margin="0,28,0,0">
+                <Grid x:Name="DnsAddressSettingsPanel" Margin="0,28,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <StackPanel>
                     <TextBlock Text="DNS IPv4" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12" />
