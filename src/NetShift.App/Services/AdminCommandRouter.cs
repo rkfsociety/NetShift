@@ -97,6 +97,17 @@ public static class AdminCommandRouter
                         "$key.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) }; if ($null -ne $key) { $key.Dispose() }");
                     break;
 
+                case "dns-reset-managed":
+                    RunPowerShell("$profile = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns', $true); " +
+                        "if ($null -ne $profile) { try { if ([int]$profile.GetValue('Enabled', 0) -eq 1) { " +
+                        "$guid = [guid]$profile.GetValue('InterfaceGuid'); " +
+                        "$adapter = Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.InterfaceGuid -eq $guid } | Select-Object -First 1; " +
+                        "if ($null -eq $adapter) { throw 'Сетевой адаптер из профиля NetShift не найден.' }; " +
+                        "Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses -ErrorAction Stop; " +
+                        "$revision = [long]$profile.GetValue('Revision', 0); $profile.SetValue('Enabled', 0, [Microsoft.Win32.RegistryValueKind]::DWord); " +
+                        "$profile.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) } } finally { $profile.Dispose() } }");
+                    break;
+
                 case "dns-legacy-apply":
                     if (args.Length < 3 || !int.TryParse(args[2], out interfaceIndex) || interfaceIndex <= 0)
                         throw new InvalidOperationException("Не удалось определить сетевой интерфейс.");
@@ -212,6 +223,16 @@ public static class AdminCommandRouter
                 case "zapret-test-strategies":
                     if (args.Length < 4) throw new InvalidOperationException("Не указана папка zapret или файл статуса проверки.");
                     RunZapretStrategyTestSweep(RequireZapretFolder(args[2]), RequireZapretTestProgressPath(args[3]));
+                    break;
+
+                case "zapret-autoconnect":
+                    if (args.Length < 7) throw new InvalidOperationException("Не переданы папка zapret, файл статуса, режим выбора, стратегия и режим запуска.");
+                    AutoConnectZapret(RequireZapretFolder(args[2]), RequireZapretTestProgressPath(args[3]), args[4], args[5], args[6]);
+                    break;
+
+                case "zapret-basic-stop":
+                    if (args.Length < 3) throw new InvalidOperationException("Не указана папка zapret.");
+                    StopBasicZapret(RequireZapretFolder(args[2]));
                     break;
 
                 case "zapret-package-install":
@@ -491,6 +512,43 @@ public static class AdminCommandRouter
         RunSc(["stop", "zapret"], allowFailure: true);
     }
 
+    private static string? QueryZapretServiceState()
+    {
+        var query = RunSc(["query", "zapret"], allowFailure: true);
+        if (query.ExitCode != 0) return null;
+        foreach (var state in new[] { "STOP_PENDING", "START_PENDING", "PAUSE_PENDING", "CONTINUE_PENDING", "RUNNING", "PAUSED", "STOPPED" })
+            if (query.Output.Contains(state, StringComparison.OrdinalIgnoreCase)) return state;
+        return null;
+    }
+
+    private static void StopBasicZapret(string folder)
+    {
+        var imagePath = GetZapretServiceImagePath();
+        if (!string.IsNullOrWhiteSpace(imagePath))
+        {
+            if (ServiceBelongsToSelectedOrNetShiftPackage(imagePath, folder))
+            {
+                var serviceState = QueryZapretServiceState();
+                if (serviceState is not null && serviceState != "STOPPED" && serviceState != "STOP_PENDING")
+                {
+                    StopZapretService(folder);
+                    WaitForServiceState("zapret", "STOPPED");
+                }
+                else if (serviceState == "STOP_PENDING")
+                {
+                    WaitForServiceState("zapret", "STOPPED");
+                }
+                SetZapretServiceToDemandIfAutomatic();
+            }
+            else if (QueryZapretServiceState() is not null and not "STOPPED")
+            {
+                throw new InvalidOperationException("Служба zapret запущена из другой папки. NetShift не будет её останавливать.");
+            }
+        }
+
+        StopManualZapretProcesses(folder);
+    }
+
     private static void EnsureServiceBelongsToPackage(string folder)
     {
         var imagePath = GetZapretServiceImagePath();
@@ -685,7 +743,7 @@ public static class AdminCommandRouter
         if (Process.Start(startInfo) is null) throw new InvalidOperationException("Не удалось запустить официальный тестовый скрипт.");
     }
 
-    private static void RunZapretStrategyTestSweep(string folder, string progressPath)
+    private static string? RunZapretStrategyTestSweep(string folder, string progressPath)
     {
         var strategies = Directory.EnumerateFiles(folder, "general*.bat", SearchOption.TopDirectoryOnly)
             .OrderBy(path => path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
@@ -790,6 +848,180 @@ public static class AdminCommandRouter
             CompletedProbeCount: completedProbeCount,
             TotalProbeCount: totalProbeCount);
         WriteZapretTestProgress(progressPath, progress);
+        return recommendedPath;
+    }
+
+    private static void AutoConnectZapret(string folder, string progressPath, string strategyMode, string requestedStrategyPath, string runtimeMode)
+    {
+        if (runtimeMode is not ("service" or "manual"))
+            throw new InvalidOperationException("Неизвестный режим запуска zapret.");
+        var previousImagePath = GetZapretServiceImagePath();
+        var previousServiceState = QueryZapretServiceState();
+        var wasRunning = previousServiceState is not null and not "STOPPED" and not "STOP_PENDING";
+        var previousManualStrategyPath = FindRunningManualStrategyPath(folder);
+        var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+        if (!wasRunning && IsZapretProcessRunning(executable) && previousManualStrategyPath is null)
+            throw new InvalidOperationException("Не удалось определить активную ручную стратегию zapret. Остановите её вручную и повторите подключение.");
+        string? previousStrategyPath = null;
+        int? previousServiceStartType = null;
+        if (!string.IsNullOrWhiteSpace(previousImagePath))
+        {
+            var serviceIsManaged = ServiceBelongsToSelectedOrNetShiftPackage(previousImagePath, folder);
+            if (serviceIsManaged) previousServiceStartType = GetZapretServiceStartType();
+            if (!serviceIsManaged && (wasRunning || runtimeMode == "service"))
+                throw new InvalidOperationException("Служба zapret установлена из другого пакета. NetShift не будет её останавливать или заменять.");
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\zapret");
+            var name = key?.GetValue("zapret-discord-youtube") as string;
+            var imageMatch = Regex.Match(previousImagePath, "^\\s*\\\"(?<path>[^\\\"]*winws\\.exe)\\\"|^\\s*(?<path>[^\\s]*winws\\.exe)", RegexOptions.IgnoreCase);
+            if (!string.IsNullOrWhiteSpace(name) && imageMatch.Success)
+            {
+                var packageFolder = Path.GetDirectoryName(Path.GetDirectoryName(imageMatch.Groups["path"].Value));
+                if (packageFolder is not null) previousStrategyPath = Path.GetFullPath(Path.Combine(packageFolder, name + ".bat"));
+            }
+        }
+        if (wasRunning && (string.IsNullOrWhiteSpace(previousStrategyPath) || !File.Exists(previousStrategyPath)))
+            throw new InvalidOperationException("Не удалось определить стратегию работающей службы zapret. Остановите её вручную и повторите подключение.");
+
+        if (wasRunning)
+        {
+            StopZapretService(folder);
+            WaitForServiceState("zapret", "STOPPED");
+        }
+        else if (previousServiceState == "STOP_PENDING")
+        {
+            WaitForServiceState("zapret", "STOPPED");
+        }
+        try
+        {
+            StopManualZapretProcesses(folder);
+            var bestPath = RunZapretStrategyTestSweep(folder, progressPath);
+            if (string.IsNullOrWhiteSpace(bestPath))
+                throw new InvalidOperationException("Не удалось проверить ни одну стратегию zapret.");
+
+            var selectedPath = strategyMode.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                ? bestPath
+                : Path.GetFullPath(requestedStrategyPath);
+            if (!Path.GetDirectoryName(selectedPath)!.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
+                !Path.GetFileName(selectedPath).StartsWith("general", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(selectedPath))
+                throw new InvalidOperationException("Выбранная стратегия не принадлежит установленному пакету zapret.");
+
+            if (runtimeMode == "service")
+            {
+                InstallZapretService(selectedPath);
+                WaitForServiceState("zapret", "RUNNING");
+            }
+            else
+            {
+                var serviceImagePath = GetZapretServiceImagePath();
+                if (!string.IsNullOrWhiteSpace(serviceImagePath) && ServiceBelongsToSelectedOrNetShiftPackage(serviceImagePath, folder))
+                    SetZapretServiceToDemandIfAutomatic();
+                StartBatch(selectedPath);
+            }
+        }
+        catch (Exception error)
+        {
+            if (wasRunning && !string.IsNullOrWhiteSpace(previousStrategyPath) && File.Exists(previousStrategyPath))
+            {
+                try
+                {
+                    if (QueryZapretServiceState() is null)
+                        InstallZapretService(previousStrategyPath);
+                    else if (QueryZapretServiceState() != "RUNNING")
+                        RunSc(["start", "zapret"]);
+                    WaitForServiceState("zapret", "RUNNING");
+                }
+                catch (Exception restoreError)
+                {
+                    throw new AggregateException("Не удалось подключить новую стратегию и восстановить прежнюю службу zapret.", error, restoreError);
+                }
+            }
+            if (previousServiceStartType is not null && GetZapretServiceImagePath() is not null)
+            {
+                try { SetZapretServiceStartType(previousServiceStartType.Value); }
+                catch (Exception restoreError)
+                {
+                    throw new AggregateException("Не удалось восстановить тип запуска прежней службы zapret.", error, restoreError);
+                }
+            }
+            if (previousManualStrategyPath is not null && File.Exists(previousManualStrategyPath))
+            {
+                try { StartBatch(previousManualStrategyPath); }
+                catch (Exception restoreError)
+                {
+                    throw new AggregateException("Не удалось подключить новую стратегию и восстановить прежний ручной запуск zapret.", error, restoreError);
+                }
+            }
+            throw;
+        }
+    }
+
+    private static string? FindRunningManualStrategyPath(string folder)
+    {
+        var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            using (process)
+            {
+                try
+                {
+                    var imagePath = process.MainModule?.FileName;
+                    if (string.IsNullOrWhiteSpace(imagePath) || !Path.GetFullPath(imagePath).Equals(executable, StringComparison.OrdinalIgnoreCase)) continue;
+                    const string prefix = "zapret: ";
+                    var title = process.MainWindowTitle.Trim();
+                    if (!title.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    var strategyPath = Path.Combine(folder, title[prefix.Length..] + ".bat");
+                    if (File.Exists(strategyPath)) return Path.GetFullPath(strategyPath);
+                }
+                catch (System.ComponentModel.Win32Exception) { }
+                catch (InvalidOperationException) { }
+            }
+        }
+        return null;
+    }
+
+    private static void StopManualZapretProcesses(string folder)
+    {
+        var executable = Path.GetFullPath(Path.Combine(folder, "bin", "winws.exe"));
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            using (process)
+            {
+                string? imagePath;
+                try { imagePath = process.MainModule?.FileName; }
+                catch (System.ComponentModel.Win32Exception) { continue; }
+                catch (InvalidOperationException) { continue; }
+                if (string.IsNullOrWhiteSpace(imagePath) || !Path.GetFullPath(imagePath).Equals(executable, StringComparison.OrdinalIgnoreCase)) continue;
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+            }
+        }
+        if (IsZapretProcessRunning(executable))
+            throw new InvalidOperationException("Не удалось остановить работающий winws.exe из выбранного пакета.");
+    }
+
+    private static int? GetZapretServiceStartType()
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\zapret");
+        return key?.GetValue("Start") is int value ? value : null;
+    }
+
+    private static void SetZapretServiceToDemandIfAutomatic()
+    {
+        if (GetZapretServiceStartType() == 2)
+            RunSc(["config", "zapret", "start=", "demand"]);
+    }
+
+    private static void SetZapretServiceStartType(int startType)
+    {
+        var startMode = startType switch
+        {
+            2 => "auto",
+            3 => "demand",
+            4 => "disabled",
+            _ => null
+        };
+        if (startMode is not null) RunSc(["config", "zapret", "start=", startMode]);
     }
 
     private static Process StartZapretTestBatch(string strategyPath, string folder)
