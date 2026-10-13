@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="NetShift" Icon="Assets/NetShift.ico" Width="1120" Height="800" MinWidth="1120" MinHeight="760"
+        Title="NetShift" Icon="Assets/NetShift.ico" Width="1120" Height="760" MinWidth="1120" MinHeight="760"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="NoResize"
         Background="{StaticResource CanvasBrush}" Foreground="{StaticResource TextBrush}">
   <shell:WindowChrome.WindowChrome>
@@ -128,7 +128,7 @@
         <ScrollViewer x:Name="DnsPage" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
             <Border MaxWidth="960" HorizontalAlignment="Center" Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="30">
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="24">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -137,7 +137,7 @@
                       <TextBlock Text="Адаптер" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" />
                       <Button Content="Обновить список" Click="RefreshAdapters_Click" DockPanel.Dock="Right" Padding="10,5" MinHeight="34" />
                     </DockPanel>
-                    <ComboBox x:Name="AdapterComboBox" SelectionChanged="AdapterComboBox_SelectionChanged" MinHeight="52" FontSize="16" />
+                    <ComboBox x:Name="AdapterComboBox" SelectionChanged="AdapterComboBox_SelectionChanged" MinHeight="46" FontSize="16" />
                     <TextBlock x:Name="CurrentDnsText" Text="Текущие DNS: загрузка…" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="4,8,0,0" />
                   </StackPanel>
                   <Border Grid.Column="1" Width="1" Background="{StaticResource BorderBrush}" HorizontalAlignment="Center" Margin="0,4" />
@@ -146,23 +146,23 @@
                       <TextBlock Text="Провайдер" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" />
                       <Button x:Name="RefreshDnsAiButton" Content="Обновить DNS-AI" Click="RefreshDnsAi_Click" DockPanel.Dock="Right" Padding="10,5" MinHeight="34" />
                     </DockPanel>
-                    <ComboBox x:Name="ProviderComboBox" DisplayMemberPath="Name" SelectionChanged="ProviderComboBox_SelectionChanged" MinHeight="52" FontSize="16" />
+                    <ComboBox x:Name="ProviderComboBox" DisplayMemberPath="Name" SelectionChanged="ProviderComboBox_SelectionChanged" MinHeight="46" FontSize="16" />
                     <TextBlock x:Name="DnsProviderStatusText" Text="DNS-AI: загружаются актуальные настройки сайта…"
                                Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="4,8,0,0" />
                   </StackPanel>
                 </Grid>
 
-                <Grid x:Name="DnsAddressSettingsPanel" Margin="0,28,0,0">
+                <Grid x:Name="DnsAddressSettingsPanel" Margin="0,22,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <StackPanel>
                     <TextBlock Text="DNS IPv4" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12" />
                     <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="132"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                       <TextBlock Text="Основной" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                      <TextBox x:Name="Ipv4TextBox" Grid.Column="1" ToolTip="Основной IPv4 адрес" MinHeight="52" FontSize="16" />
+                      <TextBox x:Name="Ipv4TextBox" Grid.Column="1" ToolTip="Основной IPv4 адрес" MinHeight="46" FontSize="16" />
                     </Grid>
                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="132"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                       <TextBlock Text="Альтернативный" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                      <TextBox x:Name="Ipv4AlternateTextBox" Grid.Column="1" ToolTip="Дополнительный IPv4 адрес" MinHeight="52" FontSize="16" />
+                      <TextBox x:Name="Ipv4AlternateTextBox" Grid.Column="1" ToolTip="Дополнительный IPv4 адрес" MinHeight="46" FontSize="16" />
                     </Grid>
                   </StackPanel>
                   <Border Grid.Column="1" Width="1" Background="{StaticResource BorderBrush}" HorizontalAlignment="Center" Margin="0,4" />
@@ -170,35 +170,35 @@
                     <TextBlock Text="DNS IPv6" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12" />
                     <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="132"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                       <TextBlock Text="Основной" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                      <TextBox x:Name="Ipv6TextBox" Grid.Column="1" ToolTip="Основной IPv6 адрес" MinHeight="52" FontSize="16" />
+                      <TextBox x:Name="Ipv6TextBox" Grid.Column="1" ToolTip="Основной IPv6 адрес" MinHeight="46" FontSize="16" />
                     </Grid>
                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="132"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                       <TextBlock Text="Альтернативный" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                      <TextBox x:Name="Ipv6AlternateTextBox" Grid.Column="1" ToolTip="Дополнительный IPv6 адрес" MinHeight="52" FontSize="16" />
+                      <TextBox x:Name="Ipv6AlternateTextBox" Grid.Column="1" ToolTip="Дополнительный IPv6 адрес" MinHeight="46" FontSize="16" />
                     </Grid>
                   </StackPanel>
                 </Grid>
 
-                <TextBlock Text="Режим защиты" FontSize="19" FontWeight="SemiBold" Margin="0,30,0,12" />
+                <TextBlock Text="Режим защиты" FontSize="19" FontWeight="SemiBold" Margin="0,22,0,10" />
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Border x:Name="LegacyModeCard" CornerRadius="12" Padding="18">
+                  <Border x:Name="LegacyModeCard" CornerRadius="12" Padding="14">
                     <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=LegacyModeRadio}" Value="True"><Setter Property="Background" Value="{StaticResource AccentDarkBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Border.Style>
                     <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" IsChecked="True" Foreground="White">
-                      <StackPanel Margin="8,0,0,0"><TextBlock Text="Legacy: локальный прокси" FontSize="17" FontWeight="SemiBold" />
-                        <TextBlock Text="Перехват и шифрование DNS через локальный прокси." Foreground="#A9BCD8" FontSize="13" TextWrapping="Wrap" Margin="0,8,0,0" /></StackPanel>
+                      <StackPanel Margin="6,0,0,0"><TextBlock Text="Legacy: локальный прокси" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="Локальный прокси шифрует DNS через DoH." Foreground="#A9BCD8" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
                     </RadioButton>
                   </Border>
-                  <Border x:Name="NativeModeCard" Grid.Column="2" CornerRadius="12" Padding="18">
+                  <Border x:Name="NativeModeCard" Grid.Column="2" CornerRadius="12" Padding="14">
                     <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=NativeModeRadio}" Value="True"><Setter Property="Background" Value="{StaticResource AccentDarkBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Border.Style>
                     <RadioButton x:Name="NativeModeRadio" GroupName="DnsMode" Foreground="{StaticResource TextBrush}">
-                      <StackPanel Margin="8,0,0,0"><TextBlock Text="Native: DNS Windows" FontSize="17" FontWeight="SemiBold" />
-                        <TextBlock Text="Использовать системный DNS Windows." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,8,0,0" /></StackPanel>
+                      <StackPanel Margin="6,0,0,0"><TextBlock Text="Native: DNS Windows" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="Системный DNS Windows." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
                     </RadioButton>
                   </Border>
                 </Grid>
 
-                <Grid x:Name="DnsDohSettingsPanel" Margin="0,26,0,0">
+                <Grid x:Name="DnsDohSettingsPanel" Margin="0,20,0,0">
                   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,0,0,8">
@@ -206,18 +206,18 @@
                     <CheckBox x:Name="DohEnabledCheckBox" Content="Использовать DoH в Windows" IsChecked="False" Margin="24,0,0,0" VerticalAlignment="Center" />
                   </StackPanel>
                   <TextBox x:Name="DohTemplateTextBox" Grid.Row="1" Grid.ColumnSpan="2" IsEnabled="{Binding IsChecked, ElementName=DohEnabledCheckBox}"
-                           ToolTip="Например: https://dns.dns-ai.ru/dns-query" MinHeight="52" FontSize="16" />
+                           ToolTip="Например: https://dns.dns-ai.ru/dns-query" MinHeight="46" FontSize="16" />
                 </Grid>
-                <WrapPanel Margin="0,18,0,0">
+                <WrapPanel Margin="0,14,0,0">
                   <CheckBox x:Name="SupportIPv6CheckBox" Content="Поддержка IPv6" IsChecked="True" Margin="0,0,24,0" VerticalAlignment="Center" />
                   <CheckBox x:Name="ConfigureVpnAdaptersCheckBox" Content="Настраивать DNS для VPN-адаптеров" ToolTip="VPN-адаптеры появятся в списке сетевых адаптеров. DNS меняется только у выбранного подключения." IsChecked="False" Click="ConfigureVpnAdapters_Click" VerticalAlignment="Center" />
                 </WrapPanel>
-                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,22,0,18" />
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,18,0,14" />
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="#062033"
-                          BorderBrush="{StaticResource AccentBrush}" Click="ApplyDns_Click" MinHeight="54" FontSize="17" />
-                  <Button Grid.Column="2" Content="Вернуть DHCP" Click="ResetDns_Click" MinHeight="54" FontSize="17" />
+                          BorderBrush="{StaticResource AccentBrush}" Click="ApplyDns_Click" MinHeight="48" FontSize="17" />
+                  <Button Grid.Column="2" Content="Вернуть DHCP" Click="ResetDns_Click" MinHeight="48" FontSize="17" />
                 </Grid>
               </StackPanel>
             </Border>
