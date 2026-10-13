@@ -241,14 +241,7 @@
                 </Grid>
                 <ProgressBar x:Name="DownloadProgressBar" Height="5" Minimum="0" Maximum="100" Visibility="Collapsed" />
                 <TextBlock x:Name="DownloadStatusText" Text="Релиз ещё не проверен" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="2,8,0,12" />
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox x:Name="ZapretFolderTextBox" IsReadOnly="True" VerticalContentAlignment="Center" />
-                  <Button x:Name="ChooseZapretFolderButton" Grid.Column="1" Content="Выбрать папку" Click="ChooseZapretFolder_Click" Margin="10,0,0,0" />
-                </Grid>
+                <TextBox x:Name="ZapretFolderTextBox" IsReadOnly="True" VerticalContentAlignment="Center" />
                 <TextBlock x:Name="ZapretStatusText" Text="Папка zapret не выбрана" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="2,10,0,0" />
               </StackPanel>
             </Border>

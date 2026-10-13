@@ -332,7 +332,6 @@ public partial class MainWindow : Window
         StrategyComboBox.IsEnabled = valid && !_isZapretStrategyTestRunning;
         CheckActiveStrategyButton.IsEnabled = valid && !_isZapretStrategyTestRunning;
         DownloadLatestButton.IsEnabled = !_isZapretStrategyTestRunning;
-        ChooseZapretFolderButton.IsEnabled = !_isZapretStrategyTestRunning;
         RefreshPackageSettings(valid ? folder : string.Empty);
         RefreshFakeFiles(valid ? folder : string.Empty);
         _ = RefreshServiceStatusAsync();
@@ -1035,23 +1034,6 @@ public partial class MainWindow : Window
 
     private static bool HasFamily(IEnumerable<string> addresses, AddressFamily expectedFamily) =>
         addresses.All(address => IPAddress.TryParse(address, out var parsed) && parsed.AddressFamily == expectedFamily);
-
-    private async void ChooseZapretFolder_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Выберите папку Flowseal/zapret-discord-youtube",
-            Multiselect = false
-        };
-
-        if (dialog.ShowDialog(this) != true) return;
-        ZapretFolderTextBox.Text = dialog.FolderName;
-        _settings.ZapretFolder = dialog.FolderName;
-        SaveSettings();
-        UpdateZapretInventory();
-        if (!_settings.InitialZapretStrategyCheckCompleted)
-            await CheckZapretStrategiesAsync(isInitialCheck: true);
-    }
 
     private async void StartStrategy_Click(object sender, RoutedEventArgs e)
     {
