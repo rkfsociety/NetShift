@@ -74,6 +74,30 @@
             </Button>
           </StackPanel>
           <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,2">
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="12" Padding="12" Margin="0,0,0,12">
+              <StackPanel>
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <Ellipse x:Name="DnsServiceIndicator" Width="11" Height="11" Fill="#718096" Margin="0,3,9,0" />
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Text="Служба DNS" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock x:Name="DnsServiceStatusText" Text="Проверка состояния…" Foreground="{StaticResource MutedBrush}"
+                               FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Grid>
+                <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="10,6" MinHeight="36" Margin="0,9,0,0" />
+                <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
+                        Padding="10,6" MinHeight="38" Margin="0,7,0,0" />
+                <Button x:Name="InstallDnsServiceButton" Content="Установить службу DNS" Click="InstallDnsService_Click"
+                        Visibility="Collapsed" Padding="10,5" MinHeight="34" Margin="0,7,0,0" />
+                <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click"
+                        Padding="10,6" MinHeight="36" Margin="0,7,0,0" />
+                <TextBlock x:Name="UpdateStatusText" Text="Проверка обновлений…" Foreground="{StaticResource MutedBrush}"
+                           FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
             <Button x:Name="SettingsNavigationButton" Tag="settings" Click="NavigatePage_Click"
                     Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12"
                     Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
@@ -97,37 +121,8 @@
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid Grid.Row="0" Margin="28,14,28,12">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <TextBlock x:Name="PageTitleText" Text="DNS" FontSize="36" FontWeight="Bold" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Width="432" HorizontalAlignment="Right">
-          <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="13,10">
-            <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                <Ellipse x:Name="DnsServiceIndicator" Width="13" Height="13" Fill="#718096" Margin="0,0,12,0" />
-                <StackPanel>
-                  <TextBlock Text="Служба DNS" FontSize="16" FontWeight="SemiBold" />
-                  <TextBlock x:Name="DnsServiceStatusText" Text="Проверка состояния…" Foreground="{StaticResource MutedBrush}" FontSize="13" />
-                </StackPanel>
-              </StackPanel>
-              <Button Grid.Column="1" Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="13,8" MinHeight="42" />
-            </Grid>
-          </Border>
-          <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
-                    Padding="12,7" MinHeight="38" MinWidth="205" Margin="0,0,8,0" />
-            <Button x:Name="InstallDnsServiceButton" Content="Установить службу DNS" Click="InstallDnsService_Click"
-                    Visibility="Collapsed" Padding="10,5" MinHeight="32" />
-            <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click"
-                    Padding="12,7" MinHeight="38" />
-          </WrapPanel>
-          <TextBlock x:Name="UpdateStatusText" Text="Проверка обновлений…" Foreground="{StaticResource MutedBrush}"
-                     FontSize="11" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="0,5,2,0" />
-        </StackPanel>
-      </Grid>
+          <TextBlock x:Name="PageTitleText" Text="DNS" FontSize="36" FontWeight="Bold" VerticalAlignment="Center" />
+        </Grid>
 
       <Grid Grid.Row="1">
         <ScrollViewer x:Name="DnsPage" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
