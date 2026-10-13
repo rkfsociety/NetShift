@@ -135,9 +135,27 @@
                 <TextBlock Text="Быстрое подключение" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock x:Name="BasicModeStatusText" Text="Отключено" Foreground="{StaticResource MutedBrush}"
                            FontSize="14" Margin="0,5,0,18" />
-                <Button x:Name="BasicConnectionButton" Content="ВКЛЮЧИТЬ" Click="BasicConnectionButton_Click"
-                        Background="#58677A" BorderBrush="#73849A" Foreground="White" FontSize="24"
-                        FontWeight="Bold" MinHeight="132" Padding="20" />
+                <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click"
+                        Background="#27384B" BorderBrush="#50647A" Foreground="White"
+                        MinHeight="96" Padding="16" RenderTransformOrigin="0.5,0.5">
+                  <Button.RenderTransform><ScaleTransform x:Name="ConnectionButtonScale" /></Button.RenderTransform>
+                  <Button.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                      <BeginStoryboard>
+                        <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                          <DoubleAnimation Storyboard.TargetName="ConnectionButtonScale" Storyboard.TargetProperty="ScaleX" From="1" To="1.015" Duration="0:0:0.9" />
+                          <DoubleAnimation Storyboard.TargetName="ConnectionButtonScale" Storyboard.TargetProperty="ScaleY" From="1" To="1.015" Duration="0:0:0.9" />
+                        </Storyboard>
+                      </BeginStoryboard>
+                    </EventTrigger>
+                  </Button.Triggers>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="BasicConnectionButtonIcon" Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets"
+                               FontSize="28" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock x:Name="BasicConnectionButtonText" Text="ВКЛЮЧИТЬ" FontSize="20"
+                               FontWeight="Bold" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
                 <TextBlock x:Name="BasicModeDetailText" Text="Выберите DNS и/или zapret. При включении zapret NetShift проверит весь список стратегий и запустит лучшую."
                            Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="2,12,2,0" />
               </StackPanel>

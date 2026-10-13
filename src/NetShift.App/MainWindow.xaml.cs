@@ -193,7 +193,7 @@ public partial class MainWindow : Window
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Подготавливаю подключение…";
             BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-            BasicConnectionButton.Content = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ПОДГОТОВКА…";
+            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ПОДГОТОВКА…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
@@ -206,7 +206,7 @@ public partial class MainWindow : Window
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Выполняется операция zapret…";
             BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-            BasicConnectionButton.Content = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ОПЕРАЦИЯ…";
+            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ОПЕРАЦИЯ…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
@@ -235,19 +235,17 @@ public partial class MainWindow : Window
             : anyActive
                 ? System.Windows.Media.Brushes.Goldenrod
                 : (System.Windows.Media.Brush)FindResource("MutedBrush");
-        BasicConnectionButton.Content = !hasSelection && !anyActive ? "ВЫБЕРИТЕ КОМПОНЕНТЫ"
-            : selectionMatches ? "ОТКЛЮЧИТЬ"
-            : anyActive && !hasSelection ? "ОТКЛЮЧИТЬ ВСЁ"
-            : anyActive ? "ПРИМЕНИТЬ ВЫБОР"
+        BasicConnectionButtonText.Text = !hasSelection && !anyActive ? "ВЫБЕРИТЕ КОМПОНЕНТЫ"
+            : selectionMatches || anyActive && !hasSelection ? "ВЫКЛЮЧИТЬ"
+            : anyActive ? "ПЕРЕПОДКЛЮЧИТЬ"
             : "ВКЛЮЧИТЬ";
+        BasicConnectionButtonIcon.Text = "\uE7E8";
         BasicConnectionButton.Background = selectionMatches
-            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(23, 217, 130))
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(25, 135, 94))
             : anyActive
-                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(218, 163, 70))
-                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(88, 103, 122));
-        BasicConnectionButton.Foreground = selectionMatches || anyActive
-            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(8, 20, 29))
-            : System.Windows.Media.Brushes.White;
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 72, 103))
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 72, 103));
+        BasicConnectionButton.Foreground = System.Windows.Media.Brushes.White;
         var busy = _isBasicConnectionActionRunning || _isZapretStrategyTestRunning || _isZapretServiceActionRunning;
         BasicConnectionButton.IsEnabled = (hasSelection || anyActive) && !busy;
 
@@ -1923,7 +1921,7 @@ public partial class MainWindow : Window
                 ? $"Проверка zapret: {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
                 : "Подготовка проверки zapret…";
             BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-            BasicConnectionButton.Content = "ПРОВЕРКА…";
+            BasicConnectionButtonText.Text = "ПРОВЕРКА…";
         }
 
         var pendingStatus = progress.Phase == "checking" ? "Проверяется…" : progress.Phase == "failed" ? "Не проверено" : "Ожидает";
