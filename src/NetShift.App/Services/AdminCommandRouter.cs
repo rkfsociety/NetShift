@@ -666,26 +666,29 @@ public static class AdminCommandRouter
 
                 progress = progress with { Phase = "checking", Message = $"Проверяю сайты через {strategyName}…" };
                 WriteZapretTestProgress(progressPath, progress);
-                var targetsLock = new object();
                 (string Name, string Url)[] targetChecks =
                 [
                     ("Discord", "https://discord.com"),
                     ("YouTube", "https://www.youtube.com"),
                     ("Google", "https://www.google.com")
                 ];
-                var checks = targetChecks.Select(async target =>
+                var results = new List<(string Name, bool Reachable)>(targetChecks.Length);
+                foreach (var target in targetChecks)
                 {
-                    var reachable = await ProbeZapretTargetAsync(target.Url).ConfigureAwait(false);
-                    lock (targetsLock)
+                    if (winws.HasExited) break;
+
+                    var reachable = ProbeZapretTargetAsync(target.Url).GetAwaiter().GetResult();
+                    results.Add((target.Name, reachable));
+                    targetResults[target.Name] = reachable;
+                    progress = progress with
                     {
-                        targetResults[target.Name] = reachable;
-                        progress = progress with { Targets = new Dictionary<string, bool?>(targetResults), Message = $"{strategyName}: проверка {target.Name} завершена." };
-                        WriteZapretTestProgress(progressPath, progress);
-                    }
-                    return (target.Name, Reachable: reachable);
-                }).ToArray();
-                var results = Task.WhenAll(checks).GetAwaiter().GetResult();
-                passed = results.All(result => result.Reachable) && !winws.HasExited;
+                        Targets = new Dictionary<string, bool?>(targetResults),
+                        Message = $"{strategyName}: проверка {target.Name} завершена."
+                    };
+                    WriteZapretTestProgress(progressPath, progress);
+                }
+
+                passed = results.Count == targetChecks.Length && results.All(result => result.Reachable) && !winws.HasExited;
                 if (!passed)
                 {
                     if (winws.HasExited)

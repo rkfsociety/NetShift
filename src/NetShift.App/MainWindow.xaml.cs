@@ -1213,15 +1213,23 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
         ZapretTestStrategyText.Text = $"Активная служба: проверяю {displayStrategyName}. Её работа не прерывается.";
         ZapretTestProgressBar.Visibility = Visibility.Visible;
-        SetZapretTargetStatus("Discord", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
-        SetZapretTargetStatus("YouTube", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
-        SetZapretTargetStatus("Google", "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
+        SetZapretTargetStatus("Discord", "Ожидает", System.Windows.Media.Brushes.Gray);
+        SetZapretTargetStatus("YouTube", "Ожидает", System.Windows.Media.Brushes.Gray);
+        SetZapretTargetStatus("Google", "Ожидает", System.Windows.Media.Brushes.Gray);
         try
         {
-            var results = await Task.WhenAll(
-                ProbeZapretTargetWithStatusAsync("Discord", "https://discord.com"),
-                ProbeZapretTargetWithStatusAsync("YouTube", "https://www.youtube.com"),
-                ProbeZapretTargetWithStatusAsync("Google", "https://www.google.com"));
+            (string Name, string Url)[] targets =
+            [
+                ("Discord", "https://discord.com"),
+                ("YouTube", "https://www.youtube.com"),
+                ("Google", "https://www.google.com")
+            ];
+            var results = new List<(string Name, bool Reachable)>(targets.Length);
+            foreach (var target in targets)
+            {
+                SetZapretTargetStatus(target.Name, "Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
+                results.Add(await ProbeZapretTargetWithStatusAsync(target.Name, target.Url));
+            }
             var healthy = results.All(result => result.Reachable);
             _settings.ZapretStrategyHealth[HealthKey(activeStrategyPath)] = healthy;
             _settings.RecommendedZapretStrategyPath = healthy ? Path.GetFullPath(activeStrategyPath) : null;
@@ -1279,7 +1287,7 @@ public partial class MainWindow : Window
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Подготовка";
         ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
-        ZapretTestStrategyText.Text = "Каждая стратегия временно запускается отдельно и останавливается после проверки. Служба Windows не изменяется.";
+        ZapretTestStrategyText.Text = "Стратегии и сайты проверяются по очереди; каждый вариант запускается отдельно и останавливается после проверки. Служба Windows не изменяется.";
         ZapretTestProgressBar.Visibility = Visibility.Visible;
         SetZapretTargetStatus("Discord", "Ожидает", System.Windows.Media.Brushes.Gray);
         SetZapretTargetStatus("YouTube", "Ожидает", System.Windows.Media.Brushes.Gray);
