@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private string? _lastZapretTestProgressJson;
     private BitmapSource? _powerButtonOff;
     private BitmapSource? _powerButtonOn;
+    private bool _powerHaloAnimating;
 
     public MainWindow()
     {
@@ -193,6 +194,39 @@ public partial class MainWindow : Window
             : (System.Windows.Media.Brush)FindResource("MutedBrush");
     }
 
+    private void UpdatePowerHalo(bool active)
+    {
+        if (_powerHaloAnimating == active) return;
+        _powerHaloAnimating = active;
+        var scale = (ScaleTransform)BasicPowerHalo.RenderTransform;
+        var glow = (System.Windows.Media.Effects.DropShadowEffect)BasicPowerHalo.Effect;
+        if (!active)
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty, null);
+            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, null);
+            BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, null);
+            BasicPowerHalo.Opacity = 0;
+            scale.ScaleX = scale.ScaleY = 1;
+            glow.BlurRadius = 14;
+            glow.Opacity = 0;
+            return;
+        }
+
+        var duration = TimeSpan.FromSeconds(1.3);
+        var repeat = System.Windows.Media.Animation.RepeatBehavior.Forever;
+        var scalePulse = new System.Windows.Media.Animation.DoubleAnimation(1, 1.14, duration) { AutoReverse = true, RepeatBehavior = repeat };
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, scalePulse);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, scalePulse);
+        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(12, 25, duration) { AutoReverse = true, RepeatBehavior = repeat });
+        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.25, 0.75, duration) { AutoReverse = true, RepeatBehavior = repeat });
+        BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.15, 0.8, duration) { AutoReverse = true, RepeatBehavior = repeat });
+    }
+
     private void UpdateBasicModeStatus()
     {
         if (BasicConnectionButton is null || BasicDnsToggle is null || BasicZapretToggle is null) return;
@@ -247,9 +281,7 @@ public partial class MainWindow : Window
             : anyActive ? "ПЕРЕПОДКЛЮЧИТЬ"
             : "ВКЛЮЧИТЬ";
         BasicPowerButtonFace.Source = anyActive ? _powerButtonOn : _powerButtonOff;
-        BasicPowerHalo.Fill = anyActive
-            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(55, 0, 200, 255))
-            : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 119, 148, 173));
+        UpdatePowerHalo(anyActive);
         var busy = _isBasicConnectionActionRunning || _isZapretStrategyTestRunning || _isZapretServiceActionRunning;
         BasicConnectionButton.IsEnabled = (hasSelection || anyActive) && !busy;
 
