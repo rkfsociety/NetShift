@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using Microsoft.Win32;
 using NetShift.App.Models;
@@ -17,6 +18,23 @@ namespace NetShift.App.Services;
 
 public static class AdminCommandRouter
 {
+    private const int HideWindow = 0;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachConsole(uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FreeConsole();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr windowHandle, int command);
+
     public static bool TryHandle(string[] args)
     {
         if (args.Length == 0 || !args[0].Equals("--admin", StringComparison.Ordinal))
@@ -243,7 +261,12 @@ public static class AdminCommandRouter
     private static void StartBatch(string scriptPath)
     {
         var executablePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(scriptPath)!, "bin", "winws.exe"));
-        if (IsZapretProcessRunning(executablePath)) return;
+        var existingProcess = FindZapretProcess(executablePath);
+        if (existingProcess is not null)
+        {
+            using (existingProcess) _ = HideZapretConsoleWindow(existingProcess.Id);
+            return;
+        }
 
         var startInfo = new ProcessStartInfo("cmd.exe")
         {
@@ -256,7 +279,12 @@ public static class AdminCommandRouter
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Не удалось запустить командный файл.");
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            if (IsZapretProcessRunning(executablePath)) return;
+            var zapretProcess = FindZapretProcess(executablePath);
+            if (zapretProcess is not null)
+            {
+                using (zapretProcess) _ = HideZapretConsoleWindow(zapretProcess.Id);
+                return;
+            }
             if (process.HasExited && attempt > 10) break;
             Thread.Sleep(100);
         }
@@ -264,6 +292,43 @@ public static class AdminCommandRouter
         var exitCode = process.HasExited ? $" Код завершения сценария: {process.ExitCode}." : string.Empty;
         throw new InvalidOperationException("Сценарий завершился, но winws.exe из выбранного пакета не запущен." + exitCode +
             " Проверьте пакет zapret и повторите запуск.");
+    }
+
+    private static Process? FindZapretProcess(string executablePath)
+    {
+        foreach (var process in Process.GetProcessesByName("winws"))
+        {
+            try
+            {
+                var runningPath = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(runningPath) &&
+                    Path.GetFullPath(runningPath).Equals(executablePath, StringComparison.OrdinalIgnoreCase))
+                    return process;
+            }
+            catch (System.ComponentModel.Win32Exception) { }
+            catch (InvalidOperationException) { }
+
+            process.Dispose();
+        }
+        return null;
+    }
+
+    private static bool HideZapretConsoleWindow(int processId)
+    {
+        // Flowseal's batch files start winws.exe with `start /min`, which creates a separate console.
+        if (!AttachConsole((uint)processId)) return false;
+        try
+        {
+            var consoleWindow = GetConsoleWindow();
+            if (consoleWindow == IntPtr.Zero) return false;
+
+            _ = ShowWindow(consoleWindow, HideWindow);
+            return true;
+        }
+        finally
+        {
+            _ = FreeConsole();
+        }
     }
 
     private static bool IsZapretProcessRunning(string executablePath)
