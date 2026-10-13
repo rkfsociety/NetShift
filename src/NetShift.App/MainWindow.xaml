@@ -74,8 +74,22 @@
             </Button>
           </StackPanel>
           <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,2">
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
+            <Button x:Name="SettingsNavigationButton" Tag="settings" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12"
+                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+            </Button>
+            <Button x:Name="AboutNavigationButton" Tag="about" Click="NavigatePage_Click"
+                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12" Margin="0,5,0,0"
+                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="О программе" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+            </Button>
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,14" />
+            <TextBlock Text="Системные действия подтверждаются Windows."
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="2,18,2,0" />
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="12" Padding="12" Margin="0,0,0,12">
+                    CornerRadius="12" Padding="12" Margin="0,14,0,0">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -97,20 +111,6 @@
                            FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
               </StackPanel>
             </Border>
-            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
-            <Button x:Name="SettingsNavigationButton" Tag="settings" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12"
-                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
-            </Button>
-            <Button x:Name="AboutNavigationButton" Tag="about" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12" Margin="0,5,0,0"
-                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="О программе" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
-            </Button>
-            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,14" />
-            <TextBlock Text="Системные действия подтверждаются Windows."
-                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="2,18,2,0" />
           </StackPanel>
         </DockPanel>
       </Border>
