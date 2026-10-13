@@ -3,11 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="NetShift" Icon="Assets/NetShift.ico" Width="1440" Height="920" MinWidth="1120" MinHeight="760"
-        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
-        Background="{StaticResource CanvasBrush}" Foreground="{StaticResource TextBrush}"
-        StateChanged="MainWindow_StateChanged">
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="NoResize"
+        Background="{StaticResource CanvasBrush}" Foreground="{StaticResource TextBrush}">
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="6" GlassFrameThickness="0"
+    <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="0" GlassFrameThickness="0"
                         CornerRadius="0" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
   <Grid>
@@ -28,10 +27,6 @@
           <Button Style="{StaticResource WindowControlButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
                   Click="MinimizeWindow_Click" ToolTip="Свернуть">
             <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
-          </Button>
-          <Button x:Name="MaximizeWindowButton" Style="{StaticResource WindowControlButtonStyle}"
-                  shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="ToggleMaximizeWindow_Click" ToolTip="Развернуть">
-            <TextBlock x:Name="MaximizeWindowGlyph" Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
           </Button>
           <Button Style="{StaticResource WindowCloseButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
                   Click="CloseWindow_Click" ToolTip="Закрыть">

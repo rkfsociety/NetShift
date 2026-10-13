@@ -127,18 +127,7 @@ public partial class MainWindow : Window
 
     private void MinimizeWindow_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
-    private void ToggleMaximizeWindow_Click(object sender, RoutedEventArgs e) =>
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-
     private void CloseWindow_Click(object sender, RoutedEventArgs e) => Close();
-
-    private void MainWindow_StateChanged(object? sender, EventArgs e)
-    {
-        if (MaximizeWindowGlyph is null) return;
-        var maximized = WindowState == WindowState.Maximized;
-        MaximizeWindowGlyph.Text = maximized ? "\uE923" : "\uE922";
-        MaximizeWindowButton.ToolTip = maximized ? "Восстановить" : "Развернуть";
-    }
 
     private void ApplyDarkTitleBar()
     {
