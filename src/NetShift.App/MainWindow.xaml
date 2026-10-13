@@ -127,7 +127,8 @@
       <Grid Grid.Row="1">
         <ScrollViewer x:Name="DnsPage" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="30">
+            <Border MaxWidth="960" HorizontalAlignment="Center" Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="30">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
