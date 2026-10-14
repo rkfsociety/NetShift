@@ -10,6 +10,7 @@ CheckZapretStrategyHealth();
 CheckZapretCurlModesAndRanking();
 CheckZapretStrategyRankingPersistence();
 CheckBackupIsIdempotent();
+CheckAdapterLookupWithStringGuid();
 CheckBackupSurvivesMissingAdapter();
 CheckDnsRestore(true, true, "reset");
 CheckDnsRestore(false, true, "reset,ipv4=1.1.1.1");
@@ -148,8 +149,22 @@ static void CheckBackupIsIdempotent()
 
 static void CheckBackupSurvivesMissingAdapter()
 {
-    var script = "$a=$null; try { " + LegacyDnsScriptFragments.RequireAdapterBeforeRestore +
+    var script = "function Get-NetAdapter { [CmdletBinding()] param([switch]$IncludeHidden) @() }; " +
+                 "$guid=[guid]'11111111-1111-1111-1111-111111111111';" + LegacyDnsScriptFragments.FindAdapterByGuid +
+                 "try { " + LegacyDnsScriptFragments.RequireAdapterBeforeRestore +
                  "throw 'RESTORE CONTINUED' } catch { if ($_.Exception.Message -eq 'Адаптер Legacy DNS пока не найден; резервная копия сохранена.') { exit 0 }; throw }";
+    RunPowerShell(script);
+}
+
+static void CheckAdapterLookupWithStringGuid()
+{
+    const string expectedGuid = "11111111-1111-1111-1111-111111111111";
+    var script = "$script:Adapters=@(" +
+                 "[pscustomobject]@{InterfaceGuid='22222222-2222-2222-2222-222222222222';InterfaceIndex=7}," +
+                 "[pscustomobject]@{InterfaceGuid='{11111111-1111-1111-1111-111111111111}';InterfaceIndex=12}); " +
+                 "function Get-NetAdapter { [CmdletBinding()] param([switch]$IncludeHidden) $script:Adapters }; " +
+                 $"$guid=[guid]'{expectedGuid}';" + LegacyDnsScriptFragments.FindAdapterByGuid +
+                 "if($null -eq $a -or $a.InterfaceIndex -ne 12){throw 'The adapter GUID string was not resolved.'}";
     RunPowerShell(script);
 }
 

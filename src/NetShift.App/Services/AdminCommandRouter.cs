@@ -136,7 +136,7 @@ public static class AdminCommandRouter
                 case "dns-legacy-restore":
                     RunPowerShell("$ErrorActionPreference='Stop'; $backup=[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\LegacyDns',$true); " +
                         "if($null -ne $backup -and [int]$backup.GetValue('Enabled',0) -eq 1){ $guid=[guid]$backup.GetValue('InterfaceGuid'); " +
-                        "$a=Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {$_.InterfaceGuid -eq $guid} | Select-Object -First 1; " +
+                        LegacyDnsScriptFragments.FindAdapterByGuid +
                         LegacyDnsScriptFragments.RequireAdapterBeforeRestore +
                         "$d4=[string[]]$backup.GetValue('IPv4');$d6=[string[]]$backup.GetValue('IPv6'); " +
                         "$dhcp4=[int]$backup.GetValue('DhcpIPv4',0) -eq 1;$dhcp6=[int]$backup.GetValue('DhcpIPv6',0) -eq 1; " +
