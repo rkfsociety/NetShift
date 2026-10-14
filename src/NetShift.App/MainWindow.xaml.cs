@@ -199,7 +199,7 @@ public partial class MainWindow : Window
         StrategyComboBox.SelectedValue = sampleStrategyPath;
         BasicStrategyComboBox.ItemsSource = new[]
         {
-            new BasicStrategyChoice("Автовыбор — лучшая по сохранённому рейтингу", null, true),
+            new BasicStrategyChoice("Авто", null, true),
             new BasicStrategyChoice(sampleStrategy.Name, sampleStrategy.Path, false)
         };
         BasicStrategyComboBox.SelectedIndex = 0;
@@ -715,7 +715,7 @@ public partial class MainWindow : Window
     {
         var choices = new List<BasicStrategyChoice>
         {
-            new("Автовыбор — лучшая по сохранённому рейтингу", null, true)
+            new("Авто", null, true)
         };
         choices.AddRange(strategies.Select(item => new BasicStrategyChoice(item.Name, item.Path, false)));
 

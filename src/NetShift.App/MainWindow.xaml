@@ -101,7 +101,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid Grid.Row="0" Margin="28,14,28,12">
+        <Grid Grid.Row="0" Margin="28,10,28,8">
           <TextBlock x:Name="PageTitleText" Text="Базовый режим" FontSize="36" FontWeight="Bold" VerticalAlignment="Center" />
           <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="{StaticResource PanelBrush}"
                   BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="3">
@@ -119,14 +119,14 @@
         </Grid>
 
       <Grid Grid.Row="1">
-        <ScrollViewer x:Name="BasicPage" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
+        <ScrollViewer x:Name="BasicPage" VerticalScrollBarVisibility="Disabled" Padding="28,0,28,8">
           <StackPanel>
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="18" Padding="24" Margin="0,0,0,16">
+                    BorderThickness="1" CornerRadius="18" Padding="18" Margin="0,0,0,10">
               <StackPanel>
                 <TextBlock Text="Быстрое подключение" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
                 <Border Background="{StaticResource PanelRaisedBrush}" CornerRadius="12" Padding="12,5"
-                        HorizontalAlignment="Center" Margin="0,10,0,14">
+                        HorizontalAlignment="Center" Margin="0,6,0,8">
                   <StackPanel Orientation="Horizontal">
                     <Ellipse Width="6" Height="6" Margin="0,0,7,0" VerticalAlignment="Center"
                              Fill="{Binding ElementName=BasicModeStatusText, Path=Foreground}" />
@@ -177,20 +177,20 @@
                   <TextBlock x:Name="BasicConnectionButtonText" Text="ВКЛЮЧИТЬ" FontSize="15" FontWeight="SemiBold"
                              HorizontalAlignment="Center" Margin="0,6,0,0" />
                 </StackPanel>
-                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="12,18,12,0" />
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="12,12,12,0" />
                 <TextBlock x:Name="BasicModeDetailText" Text="Выберите DNS и/или zapret. При включении zapret NetShift проверит весь список стратегий и запустит лучшую."
-                           Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
-                           LineHeight="20" MaxWidth="390" HorizontalAlignment="Center" Margin="8,14,8,0" />
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
+                           LineHeight="18" MaxWidth="390" HorizontalAlignment="Center" Margin="8,8,8,0" />
               </StackPanel>
             </Border>
 
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="18" Padding="22">
+                    BorderThickness="1" CornerRadius="18" Padding="16">
               <StackPanel>
-                <TextBlock Text="Параметры подключения" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,14" />
+                <TextBlock Text="Параметры подключения" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="58"/><RowDefinition Height="58"/></Grid.RowDefinitions>
+                  <Grid.RowDefinitions><RowDefinition Height="50"/><RowDefinition Height="50"/><RowDefinition Height="50"/></Grid.RowDefinitions>
                   <CheckBox x:Name="BasicDnsToggle" Content="DNS" Style="{StaticResource CardSwitchStyle}"
                             IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
                             AutomationProperties.Name="Включать DNS при подключении" />
@@ -200,7 +200,8 @@
                             IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
                             AutomationProperties.Name="Включать zapret при подключении" />
                   <ComboBox x:Name="BasicStrategyComboBox" Grid.Row="1" Grid.Column="2" DisplayMemberPath="Name"
-                            MinHeight="44" VerticalAlignment="Center" SelectionChanged="BasicStrategyComboBox_SelectionChanged" />
+                            MinHeight="44" VerticalAlignment="Center" SelectionChanged="BasicStrategyComboBox_SelectionChanged"
+                            ToolTip="Автоматически выбирается стратегия с наилучшим сохранённым рейтингом." />
                   <CheckBox x:Name="BasicZapretServiceToggle" Grid.Row="2" Content="Служба Windows"
                             Style="{StaticResource CardSwitchStyle}" IsChecked="True"
                             Click="BasicZapretServiceToggle_Click" VerticalAlignment="Center"
