@@ -20,8 +20,9 @@
     <Grid Grid.Row="0" Background="{StaticResource SidebarBrush}" Panel.ZIndex="1">
       <Border Height="1" VerticalAlignment="Bottom" Background="{StaticResource BorderBrush}" />
       <DockPanel LastChildFill="False">
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
-          <Canvas Width="26" Height="26">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="28,0,0,0">
+          <Canvas Width="34" Height="34">
+            <Canvas.RenderTransform><ScaleTransform ScaleX="1.15" ScaleY="1.15" /></Canvas.RenderTransform>
             <Path Data="M13,3 L21,8 L21,18 L13,23 L5,18 L5,8 Z M13,3 L13,13 M21,8 L13,13 L5,8 M21,18 L13,13 L13,23 M5,18 L13,13"
                   Stroke="{StaticResource AccentBrush}" StrokeThickness="1.6" />
             <Ellipse Canvas.Left="10" Canvas.Top="0" Width="6" Height="6" Fill="{StaticResource PanelBrush}" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" />
@@ -32,16 +33,16 @@
             <Ellipse Canvas.Left="2" Canvas.Top="5" Width="6" Height="6" Fill="{StaticResource PanelBrush}" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" />
             <Ellipse Canvas.Left="10" Canvas.Top="10" Width="6" Height="6" Fill="{StaticResource AccentBrush}" />
           </Canvas>
-          <TextBlock Text="NetShift" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
+          <TextBlock Text="NetShift" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
         </StackPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
           <Button Style="{StaticResource WindowControlButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
                   Click="MinimizeWindow_Click" ToolTip="Свернуть">
-            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
           </Button>
           <Button Style="{StaticResource WindowCloseButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True"
                   Click="CloseWindow_Click" ToolTip="Закрыть">
-            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
           </Button>
         </StackPanel>
       </DockPanel>
@@ -112,6 +113,12 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        <Canvas x:Name="BasicHeaderChevrons" Grid.Row="0" Panel.ZIndex="0" IsHitTestVisible="False">
+          <Path Canvas.Left="0" Canvas.Top="1" Data="M 1,18 L 20,1 L 65,1 L 34,18 L 65,35 L 20,35 Z"
+                Fill="#071821" Stroke="#16475A" StrokeThickness="1" Opacity="0.48" />
+          <Path Canvas.Right="0" Canvas.Top="1" Data="M 64,18 L 45,1 L 0,1 L 31,18 L 0,35 L 45,35 Z"
+                Fill="#071821" Stroke="#16475A" StrokeThickness="1" Opacity="0.48" />
+        </Canvas>
         <Grid x:Name="PageHeaderGrid" Grid.Row="0" Margin="16,11,16,3">
           <TextBlock x:Name="PageTitleText" Text="Базовый режим" FontSize="19" FontWeight="SemiBold"
                      Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
@@ -131,41 +138,80 @@
         </Grid>
 
       <Grid Grid.Row="1">
-        <ScrollViewer x:Name="BasicPage" VerticalScrollBarVisibility="Disabled" Padding="16,0,16,8">
+        <Canvas x:Name="BasicSideRails" Panel.ZIndex="0" IsHitTestVisible="False">
+          <Path Canvas.Left="0" Canvas.Top="16" Data="M 0,0 L 15,15 L 15,112 L 0,127"
+                Stroke="{StaticResource AccentBrush}" StrokeThickness="1" Opacity="0.55" />
+          <Path Canvas.Left="0" Canvas.Top="122" Data="M 0,0 L 24,24 L 24,276 L 0,300"
+                Stroke="{StaticResource BorderBrush}" StrokeThickness="1" Opacity="0.75" />
+          <Path Canvas.Right="0" Canvas.Top="16" Data="M 15,0 L 0,15 L 0,112 L 15,127"
+                Stroke="{StaticResource AccentBrush}" StrokeThickness="1" Opacity="0.55" />
+          <Path Canvas.Right="0" Canvas.Top="122" Data="M 24,0 L 0,24 L 0,276 L 24,300"
+                Stroke="{StaticResource BorderBrush}" StrokeThickness="1" Opacity="0.75" />
+          <Rectangle Canvas.Left="9" Canvas.Top="78" Width="5" Height="72" RadiusX="2" RadiusY="2"
+                     Fill="{StaticResource AccentBrush}" Opacity="0.72">
+            <Rectangle.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="10" ShadowDepth="0" Opacity="0.75" /></Rectangle.Effect>
+          </Rectangle>
+          <Rectangle Canvas.Right="9" Canvas.Top="78" Width="5" Height="72" RadiusX="2" RadiusY="2"
+                     Fill="{StaticResource AccentBrush}" Opacity="0.72">
+            <Rectangle.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="10" ShadowDepth="0" Opacity="0.75" /></Rectangle.Effect>
+          </Rectangle>
+          <Path Canvas.Left="18" Canvas.Top="236" Data="M 0,0 L 34,34 L 34,108 L 0,142"
+                Stroke="#103448" StrokeThickness="1" Opacity="0.34" />
+          <Path Canvas.Right="18" Canvas.Top="236" Data="M 34,0 L 0,34 L 0,108 L 34,142"
+                Stroke="#103448" StrokeThickness="1" Opacity="0.34" />
+        </Canvas>
+        <ScrollViewer x:Name="BasicPage" Panel.ZIndex="1" VerticalScrollBarVisibility="Disabled" Padding="26,0,26,8">
           <StackPanel>
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" Padding="12,10" Margin="0,0,0,5">
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
-                <Ellipse x:Name="BasicModeStatusIndicator" Width="12" Height="12"
+            <Grid Width="455" Height="62" HorizontalAlignment="Center" Margin="0,0,0,5">
+              <Path Data="M 14,1 L 441,1 L 454,14 L 454,48 L 441,61 L 14,61 L 1,48 L 1,14 Z"
+                    Stretch="Fill" Fill="{StaticResource PanelBrush}" Stroke="{StaticResource BorderBrush}" StrokeThickness="1.4">
+                <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="11" ShadowDepth="0" Opacity="0.18" /></Path.Effect>
+              </Path>
+              <Grid Margin="22,7,18,7">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                <Ellipse x:Name="BasicModeStatusIndicator" Width="19" Height="19"
                          Fill="{Binding ElementName=BasicModeStatusText, Path=Foreground}" VerticalAlignment="Center">
-                  <Ellipse.Effect><DropShadowEffect Color="#28E4B4" BlurRadius="12" ShadowDepth="0" Opacity="0.48" /></Ellipse.Effect>
+                  <Ellipse.Effect><DropShadowEffect Color="#28E4B4" BlurRadius="14" ShadowDepth="0" Opacity="0.65" /></Ellipse.Effect>
                 </Ellipse>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="9,0,0,0">
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
                   <TextBlock x:Name="BasicModeStatusText" Text="Подключение не активно" Foreground="{StaticResource MutedBrush}"
-                             FontSize="16" FontWeight="SemiBold" />
+                             FontSize="20" FontWeight="SemiBold" />
                   <TextBlock x:Name="BasicModeProviderText" Text="Используется: Cloudflare" Foreground="{StaticResource MutedBrush}"
-                             FontSize="12" Margin="0,1,0,0" />
+                             FontSize="14" />
                 </StackPanel>
-                <Canvas Grid.Column="2" Width="28" Height="24" VerticalAlignment="Center" HorizontalAlignment="Right">
-                  <Path Data="M1,7 C7,1 21,1 27,7 M5,12 C10,7 18,7 23,12 M9,17 C12,14 16,14 19,17"
-                        Stroke="{StaticResource AccentBrush}" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                  <Ellipse Canvas.Left="12" Canvas.Top="20" Width="4" Height="4" Fill="{StaticResource AccentBrush}" />
+                <Canvas Grid.Column="2" Width="32" Height="28" VerticalAlignment="Center" HorizontalAlignment="Right">
+                  <Path Data="M1,8 C8,0 24,0 31,8 M6,14 C12,8 20,8 26,14 M11,20 C14,17 18,17 21,20"
+                        Stroke="{StaticResource AccentBrush}" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                  <Ellipse Canvas.Left="14" Canvas.Top="23" Width="4" Height="4" Fill="{StaticResource AccentBrush}" />
                 </Canvas>
               </Grid>
-            </Border>
+            </Grid>
 
-            <Grid Height="214" Margin="0,0,0,0">
-              <Grid Width="300" Height="214" HorizontalAlignment="Center">
-                <Ellipse Width="286" Height="214" Stroke="#0E425B" StrokeThickness="1.5" Opacity="0.8" />
-                <Ellipse Width="250" Height="194" Stroke="#0A2C3D" StrokeThickness="10" Opacity="0.75" />
-                <Ellipse x:Name="BasicPowerHalo" Width="200" Height="174" Fill="Transparent"
+            <Grid Height="214">
+              <Grid Width="326" Height="258" Margin="0,-22,0,-22" HorizontalAlignment="Center">
+                <Ellipse Width="316" Height="242" Opacity="0.78">
+                  <Ellipse.Fill>
+                    <RadialGradientBrush Center="0.5,0.46" GradientOrigin="0.5,0.46" RadiusX="0.62" RadiusY="0.66">
+                      <GradientStop Color="#2812A5D6" Offset="0" />
+                      <GradientStop Color="#180A3448" Offset="0.62" />
+                      <GradientStop Color="#000A3448" Offset="1" />
+                    </RadialGradientBrush>
+                  </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="326" Height="244" Stroke="#0E425B" StrokeThickness="1.5" Opacity="0.9" />
+                <Ellipse Width="310" Height="228" Stroke="#0A2C3D" StrokeThickness="13" Opacity="0.78" />
+                <Ellipse Width="264" Height="210" Stroke="#0B3549" StrokeThickness="1.4" Opacity="0.9" />
+                <Path Data="M 50,38 L 76,60 M 276,38 L 250,60 M 30,107 L 57,107 M 296,107 L 269,107 M 50,176 L 76,154 M 276,176 L 250,154"
+                      Stroke="#0C3A4E" StrokeThickness="1.3" Opacity="0.8" />
+                <Path Data="M 31,74 L 38,76 M 28,83 L 36,85 M 27,92 L 36,94 M 26,101 L 35,103 M 26,110 L 35,112 M 27,119 L 36,121 M 28,128 L 36,130 M 31,137 L 38,139 M 295,74 L 288,76 M 298,83 L 290,85 M 299,92 L 290,94 M 300,101 L 291,103 M 300,110 L 291,112 M 299,119 L 290,121 M 298,128 L 290,130 M 295,137 L 288,139"
+                      Stroke="#1B5C75" StrokeThickness="3.2" StrokeStartLineCap="Square" Opacity="0.88" />
+                <Ellipse x:Name="BasicPowerHalo" Width="244" Height="184" Fill="Transparent"
                          Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
                   <Ellipse.RenderTransform><ScaleTransform x:Name="PowerHaloScale" /></Ellipse.RenderTransform>
-                  <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="19" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
+                  <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="22" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
                 </Ellipse>
-                <Ellipse Width="176" Height="156" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" Opacity="0.72" />
-                <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click" Width="142" Height="142"
+                <Ellipse Width="206" Height="184" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0.78" />
+                <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click" Width="188" Height="188"
                         Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Cursor="Hand" ToolTip="{Binding ElementName=BasicConnectionButtonText, Path=Text}"
                         AutomationProperties.Name="{Binding ElementName=BasicConnectionButtonText, Path=Text}">
@@ -194,100 +240,101 @@
                       </ControlTemplate.Triggers>
                     </ControlTemplate>
                   </Button.Template>
-                  <Image x:Name="BasicPowerButtonFace" Width="142" Height="142" Stretch="Fill" />
+                  <Image x:Name="BasicPowerButtonFace" Width="188" Height="188" Stretch="Fill" />
                 </Button>
               </Grid>
             </Grid>
             <Button x:Name="BasicReconnectButton" Click="BasicConnectionButton_Click" Style="{StaticResource NeonActionButtonStyle}"
-                    Width="334" Height="62" MinHeight="62" HorizontalAlignment="Center" Margin="0,0,0,2"
-                    ToolTip="{Binding ElementName=BasicConnectionButtonText, Path=Text}"
+                    Width="347" Height="58" MinHeight="58" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,2"
+                    ToolTip="Обновить DNS и переподключить zapret"
                     IsEnabled="{Binding IsEnabled, ElementName=BasicConnectionButton}"
-                    AutomationProperties.Name="{Binding ElementName=BasicConnectionButtonText, Path=Text}">
+                    AutomationProperties.Name="Переподключить">
               <StackPanel Orientation="Horizontal">
-                <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="22"
-                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <TextBlock Text="{Binding Text, ElementName=BasicConnectionButtonText}" VerticalAlignment="Center" />
+                <TextBlock Text="Переподключить" FontSize="23" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Canvas Width="28" Height="28" VerticalAlignment="Center" Margin="12,0,0,0">
+                  <Path Data="M 4,10 C 7,2 18,2 22,9 M 22,9 L 22,3 M 22,9 L 16,9 M 24,17 C 21,25 10,25 6,18 M 6,18 L 6,24 M 6,18 L 12,18"
+                        Stroke="{StaticResource AccentBrush}" StrokeThickness="2.6"
+                        StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                </Canvas>
               </StackPanel>
             </Button>
-            <TextBlock x:Name="BasicConnectionButtonText" Text="ВКЛЮЧИТЬ" Visibility="Collapsed" />
+            <TextBlock x:Name="BasicConnectionButtonText" Text="Включить" Visibility="Collapsed" />
             <TextBlock x:Name="BasicModeDetailText" Text="Нажмите, чтобы обновить DNS и zapret к выбранным переключателям."
-                       Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
-                       LineHeight="18" MaxWidth="360" HorizontalAlignment="Center" Margin="6,5,6,10" />
+                       Foreground="{StaticResource MutedBrush}" FontSize="16" TextWrapping="Wrap" TextAlignment="Center"
+                       LineHeight="20" MaxWidth="440" HorizontalAlignment="Center" Margin="6,5,6,8" />
 
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" Padding="12,12" Margin="0,0,0,0">
-              <StackPanel>
-                <Grid Margin="1,0,1,5">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="22"
+            <Grid Height="224">
+              <Path Data="M 16,1 L 492,1 L 507,16 L 507,208 L 492,223 L 16,223 L 1,208 L 1,16 Z"
+                    Stretch="Fill" Fill="{StaticResource PanelBrush}" Stroke="{StaticResource BorderBrush}" StrokeThickness="1.4">
+                <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="12" ShadowDepth="0" Opacity="0.16" /></Path.Effect>
+              </Path>
+              <StackPanel Margin="15,9,15,9">
+                <Grid Height="34" Margin="1,0,1,2">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="20"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="26"
                              Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="Параметры подключения" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" Text="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                  <TextBlock Grid.Column="1" Text="Параметры подключения" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="20"
                              Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                 </Grid>
                 <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,2" />
                 <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="112"/><ColumnDefinition Width="*"/><ColumnDefinition Width="46"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="62"/><RowDefinition Height="62"/><RowDefinition Height="62"/></Grid.RowDefinitions>
-                  <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{StaticResource AccentBrush}"
-                             VerticalAlignment="Center" />
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="1.07*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="54"/></Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions><RowDefinition Height="55"/><RowDefinition Height="55"/><RowDefinition Height="55"/></Grid.RowDefinitions>
+
+                  <Border Width="44" Height="44" CornerRadius="22" Background="#091B25" BorderBrush="#16485D" BorderThickness="1"
+                          VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0">
+                    <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="25" Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
                   <TextBlock Grid.Column="1" Text="DNS-провайдер" Foreground="{StaticResource MutedBrush}"
-                             VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap" />
-                  <ComboBox x:Name="BasicDnsProviderComboBox" Grid.Column="2" DisplayMemberPath="Name"
-                            MinHeight="38" FontSize="12" Padding="9,6" VerticalAlignment="Center"
+                             VerticalAlignment="Center" FontSize="16" TextWrapping="Wrap" />
+                  <ComboBox x:Name="BasicDnsProviderComboBox" Grid.Column="2" Grid.ColumnSpan="2" DisplayMemberPath="Name"
+                            Width="196" HorizontalAlignment="Right" MinHeight="38" FontSize="16" Padding="12,6" VerticalAlignment="Center"
                             SelectionChanged="BasicDnsProviderComboBox_SelectionChanged" />
-                  <CheckBox x:Name="BasicDnsToggle" Grid.Column="3" Content="DNS" Style="{StaticResource CardSwitchStyle}"
-                            IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
-                            AutomationProperties.Name="Включать DNS при подключении" />
                   <Border Grid.Row="0" Grid.ColumnSpan="4" Height="1" Background="{StaticResource BorderBrush}"
-                          VerticalAlignment="Bottom" Margin="0,0,0,0" Opacity="0.62" />
+                          VerticalAlignment="Bottom" Opacity="0.72" />
 
-                  <Path Grid.Row="1" Width="20" Height="23" Stretch="Fill"
-                        Data="M10,1 L19,4 L19,11 C19,16 15,20 10,22 C5,20 1,16 1,11 L1,4 Z M10,6 L10,17 M6,10 L14,10"
-                        Stroke="{StaticResource AccentBrush}" StrokeThickness="1.7"
-                        StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" />
-                  <TextBlock Grid.Row="1" Grid.Column="1" Text="zapret" Foreground="{StaticResource MutedBrush}"
-                             VerticalAlignment="Center" FontSize="12" />
-                  <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal"
-                              HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <CheckBox x:Name="BasicZapretToggle" Content="zapret" Style="{StaticResource CardSwitchStyle}"
-                              IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
-                              ToolTip="Включать zapret при подключении" AutomationProperties.Name="Включать zapret при подключении" />
-                    <TextBlock x:Name="BasicZapretModeText" Text="Служба" Foreground="{StaticResource MutedBrush}"
-                               FontSize="11" VerticalAlignment="Center" Margin="9,0,5,0" />
-                    <CheckBox x:Name="BasicZapretServiceToggle" Content="Служба Windows"
-                              Style="{StaticResource CardSwitchStyle}" IsChecked="True"
-                              Click="BasicZapretServiceToggle_Click" VerticalAlignment="Center"
-                              ToolTip="Включено — запуск как службы Windows. Выключено — фоновый запуск без службы."
-                              AutomationProperties.Name="Режим запуска zapret: служба Windows" />
-                  </StackPanel>
+                  <Border Grid.Row="1" Width="44" Height="44" CornerRadius="22" Background="#091B25" BorderBrush="#16485D" BorderThickness="1"
+                          VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0">
+                    <Path Width="23" Height="26" Stretch="Fill"
+                          Data="M12,1 L22,5 L22,12 C22,18 18,23 12,26 C6,23 2,18 2,12 L2,5 Z M12,6 L12,20"
+                          Stroke="{StaticResource AccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="Запрет фонового zapret-процесса"
+                             Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="16" TextWrapping="Wrap" MaxWidth="150" />
+                  <CheckBox x:Name="BasicZapretServiceToggle" Grid.Row="1" Grid.Column="3" Style="{StaticResource CardSwitchStyle}"
+                            IsChecked="True" Click="BasicZapretServiceToggle_Click" VerticalAlignment="Center"
+                            ToolTip="Включено — запуск zapret как службы Windows, без фонового процесса."
+                            AutomationProperties.Name="Запрет фонового zapret-процесса" />
                   <Border Grid.Row="1" Grid.ColumnSpan="4" Height="1" Background="{StaticResource BorderBrush}"
-                          VerticalAlignment="Bottom" Opacity="0.62" />
+                          VerticalAlignment="Bottom" Opacity="0.72" />
 
-                  <TextBlock Grid.Row="2" Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="21"
-                             Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                  <Border Grid.Row="2" Width="44" Height="44" CornerRadius="22" Background="#091B25" BorderBrush="#16485D" BorderThickness="1"
+                          VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0">
+                    <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="27" Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
                   <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Автовыбор" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="12" />
-                    <Border Width="18" Height="18" CornerRadius="9" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                            Margin="7,0,0,0" ToolTip="Автоматически выбирается стратегия с наилучшим сохранённым рейтингом.">
-                      <TextBlock Text="?" Foreground="{StaticResource MutedBrush}" FontSize="11"
+                    <TextBlock Text="Авто" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="16" />
+                    <Border Width="22" Height="22" CornerRadius="11" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Margin="9,0,0,0" ToolTip="Автоматически выбирается стратегия с наилучшим сохранённым рейтингом.">
+                      <TextBlock Text="?" Foreground="{StaticResource MutedBrush}" FontSize="15"
                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                   </StackPanel>
-                  <TextBlock x:Name="BasicAutoStrategyNameText" Grid.Row="2" Grid.Column="2" Text="Авто"
-                             Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" FontSize="12" />
-                  <ComboBox x:Name="BasicStrategyComboBox" Grid.Row="2" Grid.Column="2"
-                            DisplayMemberPath="Name" MinHeight="38" FontSize="12" Padding="9,6"
-                            VerticalAlignment="Center" Visibility="Collapsed"
+                  <ComboBox x:Name="BasicStrategyComboBox" Grid.Row="2" Grid.Column="2" DisplayMemberPath="Name"
+                            MinHeight="38" FontSize="13" Padding="9,6" VerticalAlignment="Center" Visibility="Collapsed"
                             SelectionChanged="BasicStrategyComboBox_SelectionChanged"
                             ToolTip="Автоматически выбирается стратегия с наилучшим сохранённым рейтингом." />
-                  <CheckBox x:Name="BasicAutoStrategyToggle" Grid.Row="2" Grid.Column="3" Content="Автовыбор"
-                            Style="{StaticResource CardSwitchStyle}" IsChecked="True" Click="BasicAutoStrategyToggle_Click"
-                            VerticalAlignment="Center" ToolTip="Автоматически выбрать стратегию по рейтингу"
+                  <CheckBox x:Name="BasicAutoStrategyToggle" Grid.Row="2" Grid.Column="3" Style="{StaticResource CardSwitchStyle}"
+                            IsChecked="True" Click="BasicAutoStrategyToggle_Click" VerticalAlignment="Center"
+                            ToolTip="Автоматически выбрать стратегию по рейтингу"
                             AutomationProperties.Name="Автоматический выбор стратегии" />
                 </Grid>
               </StackPanel>
-            </Border>
+            </Grid>
           </StackPanel>
         </ScrollViewer>
 
@@ -635,6 +682,28 @@
         <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,0,28,24">
           <StackPanel>
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" Padding="24">
+              <StackPanel>
+                <TextBlock Text="Параметры базового режима" FontSize="20" FontWeight="SemiBold" />
+                <Grid Margin="0,12,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions><RowDefinition Height="54"/><RowDefinition Height="54"/></Grid.RowDefinitions>
+                  <TextBlock Text="Включать DNS при подключении" Foreground="{StaticResource MutedBrush}"
+                             VerticalAlignment="Center" FontSize="15" />
+                  <CheckBox x:Name="BasicDnsToggle" Grid.Column="1" Style="{StaticResource CardSwitchStyle}"
+                            IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
+                            AutomationProperties.Name="Включать DNS при подключении" />
+                  <Border Grid.Row="0" Grid.ColumnSpan="2" Height="1" Background="{StaticResource BorderBrush}"
+                          VerticalAlignment="Bottom" Opacity="0.65" />
+                  <TextBlock Grid.Row="1" Text="Включать zapret при подключении" Foreground="{StaticResource MutedBrush}"
+                             VerticalAlignment="Center" FontSize="15" />
+                  <CheckBox x:Name="BasicZapretToggle" Grid.Row="1" Grid.Column="1" Style="{StaticResource CardSwitchStyle}"
+                            IsChecked="True" Click="BasicModuleToggle_Click" VerticalAlignment="Center"
+                            AutomationProperties.Name="Включать zapret при подключении" />
+                </Grid>
+              </StackPanel>
+            </Border>
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1" CornerRadius="6" Padding="28">
               <StackPanel>
                 <TextBlock Text="Обновления" FontSize="20" FontWeight="SemiBold" />
@@ -678,8 +747,18 @@
   </Grid>
     <Path Grid.RowSpan="2" Panel.ZIndex="10" IsHitTestVisible="False"
           Data="M 18,1 L 542,1 L 559,18 L 559,742 L 542,759 L 18,759 L 1,742 L 1,18 Z"
-          Stretch="Fill" Fill="Transparent" Stroke="#17627D" StrokeThickness="1.3">
-      <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="13" ShadowDepth="0" Opacity="0.36" /></Path.Effect>
+          Stretch="Fill" Fill="Transparent" Stroke="{StaticResource BorderBrush}" StrokeThickness="1.2" Opacity="0.8">
+      <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="11" ShadowDepth="0" Opacity="0.14" /></Path.Effect>
+    </Path>
+    <Path Grid.RowSpan="2" Panel.ZIndex="11" IsHitTestVisible="False"
+          Data="M 18,1 L 38,1 M 1,18 L 1,38 M 542,1 L 522,1 M 559,18 L 559,38 M 18,759 L 38,759 M 1,742 L 1,722 M 542,759 L 522,759 M 559,742 L 559,722"
+          Stretch="Fill" Fill="Transparent" Stroke="{StaticResource AccentBrush}" StrokeThickness="2.2" Opacity="0.88">
+      <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="13" ShadowDepth="0" Opacity="0.7" /></Path.Effect>
+    </Path>
+    <Path Grid.RowSpan="2" Panel.ZIndex="11" IsHitTestVisible="False"
+          Data="M 18,1 L 542,1 M 18,759 L 542,759"
+          Stretch="Fill" Fill="Transparent" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" Opacity="0.72">
+      <Path.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="12" ShadowDepth="0" Opacity="0.54" /></Path.Effect>
     </Path>
   </Grid>
 </Window>

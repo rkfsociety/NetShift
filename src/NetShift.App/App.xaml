@@ -3,15 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnMainWindowClose">
   <Application.Resources>
-    <SolidColorBrush x:Key="CanvasBrush" Color="#030A10" />
+    <RadialGradientBrush x:Key="CanvasBrush" Center="0.5,0.43" GradientOrigin="0.5,0.43" RadiusX="0.86" RadiusY="0.9">
+      <GradientStop Color="#091C28" Offset="0" />
+      <GradientStop Color="#040D14" Offset="0.5" />
+      <GradientStop Color="#02070B" Offset="1" />
+    </RadialGradientBrush>
     <SolidColorBrush x:Key="SidebarBrush" Color="#041019" />
-    <SolidColorBrush x:Key="PanelBrush" Color="#071720" />
-    <SolidColorBrush x:Key="PanelRaisedBrush" Color="#0A1D28" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#17465B" />
+    <LinearGradientBrush x:Key="PanelBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#0A1B25" Offset="0" />
+      <GradientStop Color="#06121A" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PanelRaisedBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#0D2532" Offset="0" />
+      <GradientStop Color="#081720" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="BorderBrush" Color="#1B4E64" />
     <SolidColorBrush x:Key="TextBrush" Color="#ECF8FF" />
     <SolidColorBrush x:Key="MutedBrush" Color="#86A8BA" />
     <SolidColorBrush x:Key="AccentBrush" Color="#12C8FF" />
-    <SolidColorBrush x:Key="AccentDarkBrush" Color="#07344A" />
+    <LinearGradientBrush x:Key="AccentDarkBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#07547D" Offset="0" />
+      <GradientStop Color="#0875A4" Offset="0.52" />
+      <GradientStop Color="#063B64" Offset="1" />
+    </LinearGradientBrush>
     <SolidColorBrush x:Key="SuccessBrush" Color="#28E4B4" />
     <LinearGradientBrush x:Key="LogoBrush" StartPoint="0,0" EndPoint="1,1">
       <GradientStop Color="#06304A" Offset="0" />
@@ -98,17 +112,17 @@
       </Setter>
     </Style>
     <Style x:Key="CardSwitchStyle" TargetType="CheckBox">
-      <Setter Property="Width" Value="46" />
-      <Setter Property="Height" Value="26" />
+      <Setter Property="Width" Value="54" />
+      <Setter Property="Height" Value="30" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="CheckBox">
-            <Grid Width="46" Height="26">
-              <Border x:Name="SwitchTrack" CornerRadius="13" Background="#0D2835"
+            <Grid Width="54" Height="30">
+              <Border x:Name="SwitchTrack" CornerRadius="15" Background="#0D2835"
                       BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
-              <Ellipse x:Name="SwitchThumb" Width="18" Height="18" Fill="#F3F7FC"
+              <Ellipse x:Name="SwitchThumb" Width="22" Height="22" Fill="#F3F7FC"
                        HorizontalAlignment="Left" Margin="4,0,0,0" />
             </Grid>
             <ControlTemplate.Triggers>
@@ -395,7 +409,7 @@
       <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Template">
@@ -407,11 +421,13 @@
                     Stretch="Fill" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}"
                     StrokeThickness="1.5">
                 <Path.Effect>
-                  <DropShadowEffect Color="#12C8FF" BlurRadius="15" ShadowDepth="0" Opacity="0.16" />
+                  <DropShadowEffect Color="#12C8FF" BlurRadius="17" ShadowDepth="0" Opacity="0.38" />
                 </Path.Effect>
               </Path>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8,0"
-                                TextElement.Foreground="{TemplateBinding Foreground}" />
+                                TextElement.Foreground="{TemplateBinding Foreground}"
+                                TextElement.FontSize="{TemplateBinding FontSize}"
+                                TextElement.FontWeight="{TemplateBinding FontWeight}" />
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">

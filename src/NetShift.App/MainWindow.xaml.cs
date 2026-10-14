@@ -130,7 +130,8 @@ public partial class MainWindow : Window
         BasicDnsToggle.IsChecked = _settings.BasicDnsEnabled;
         BasicZapretToggle.IsChecked = _settings.BasicZapretEnabled;
         BasicZapretServiceToggle.IsChecked = _settings.BasicZapretUseService;
-        BasicZapretModeText.Text = _settings.BasicZapretUseService ? "Служба" : "Фон";
+        BasicAutoStrategyToggle.IsChecked = _settings.BasicZapretAutoStrategy;
+        BasicStrategyComboBox.Visibility = _settings.BasicZapretAutoStrategy ? Visibility.Collapsed : Visibility.Visible;
         _isSyncingBasicSelectors = false;
         LegacyModeRadio.IsChecked = !_settings.NativeDnsMode;
         NativeModeRadio.IsChecked = _settings.NativeDnsMode;
@@ -178,6 +179,8 @@ public partial class MainWindow : Window
         BasicDnsToggle.IsChecked = true;
         BasicZapretToggle.IsChecked = true;
         BasicZapretServiceToggle.IsChecked = true;
+        BasicAutoStrategyToggle.IsChecked = false;
+        BasicStrategyComboBox.Visibility = Visibility.Collapsed;
 
         AppAutoStartCheckBox.IsChecked = false;
         AppAutoStartStatusText.Text = "Выключен";
@@ -263,6 +266,8 @@ public partial class MainWindow : Window
         }
         SidebarPanel.Visibility = isBasicMode ? Visibility.Collapsed : Visibility.Visible;
         SidebarColumn.Width = isBasicMode ? new GridLength(0) : new GridLength(240);
+        BasicHeaderChevrons.Visibility = isBasicMode ? Visibility.Visible : Visibility.Collapsed;
+        BasicSideRails.Visibility = isBasicMode ? Visibility.Visible : Visibility.Collapsed;
 
         BasicPage.Visibility = isBasicMode ? Visibility.Visible : Visibility.Collapsed;
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
@@ -293,7 +298,7 @@ public partial class MainWindow : Window
                 BasicModeStatusText.Text = "Подключение активно";
                 BasicModeStatusText.Foreground = (System.Windows.Media.Brush)FindResource("SuccessBrush");
                 BasicModeProviderText.Text = "Используется: Cloudflare";
-                BasicConnectionButtonText.Text = "ПЕРЕПОДКЛЮЧИТЬ";
+                BasicConnectionButtonText.Text = "Переподключить";
                 BasicModeDetailText.Text = "Нажмите, чтобы обновить DNS и zapret к выбранным переключателям.";
                 BasicPowerButtonFace.Source = _powerButtonOn;
                 UpdatePowerHalo(active: true);
@@ -380,7 +385,7 @@ public partial class MainWindow : Window
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Подготавливаю подключение…";
             BasicModeStatusText.Foreground = GetAccentBrush();
-            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ПОДГОТОВКА…";
+            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "Проверка…" : "Подготовка…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
@@ -394,7 +399,7 @@ public partial class MainWindow : Window
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Выполняется операция zapret…";
             BasicModeStatusText.Foreground = GetAccentBrush();
-            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ОПЕРАЦИЯ…";
+            BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "Проверка…" : "Операция…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
@@ -426,10 +431,10 @@ public partial class MainWindow : Window
             : anyActive
                 ? System.Windows.Media.Brushes.Goldenrod
                 : (System.Windows.Media.Brush)FindResource("MutedBrush");
-        BasicConnectionButtonText.Text = !hasSelection && !anyActive ? "ВЫБЕРИТЕ КОМПОНЕНТЫ"
-            : selectionMatches || anyActive && !hasSelection ? "ВЫКЛЮЧИТЬ"
-            : anyActive ? "ПЕРЕПОДКЛЮЧИТЬ"
-            : "ВКЛЮЧИТЬ";
+        BasicConnectionButtonText.Text = !hasSelection && !anyActive ? "Выберите компоненты"
+            : selectionMatches || anyActive && !hasSelection ? "Отключить"
+            : anyActive ? "Переподключить"
+            : "Включить";
         BasicPowerButtonFace.Source = anyActive ? _powerButtonOn : _powerButtonOff;
         UpdatePowerHalo(anyActive);
         var busy = _isBasicConnectionActionRunning || _isZapretStrategyTestRunning || _isZapretServiceActionRunning;
@@ -1075,7 +1080,6 @@ public partial class MainWindow : Window
     private void SetBasicAutoStrategyControls(bool isAutomatic)
     {
         BasicAutoStrategyToggle.IsChecked = isAutomatic;
-        BasicAutoStrategyNameText.Visibility = isAutomatic ? Visibility.Visible : Visibility.Collapsed;
         BasicStrategyComboBox.Visibility = isAutomatic ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -1093,7 +1097,6 @@ public partial class MainWindow : Window
     {
         if (_isBasicConnectionActionRunning) return;
         _settings.BasicZapretUseService = BasicZapretServiceToggle.IsChecked == true;
-        BasicZapretModeText.Text = _settings.BasicZapretUseService ? "Служба" : "Фон";
         SaveSettings();
         UpdateBasicModeStatus();
     }
@@ -1564,6 +1567,7 @@ public partial class MainWindow : Window
     private async void BasicConnectionButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isBasicConnectionActionRunning) return;
+        var forceReconnect = ReferenceEquals(sender, BasicReconnectButton);
         var dnsSelected = BasicDnsToggle.IsChecked == true;
         var zapretSelected = BasicZapretToggle.IsChecked == true;
 
@@ -1581,7 +1585,7 @@ public partial class MainWindow : Window
                 : _isManualZapretRunning && !_isZapretServiceRunning);
             var selectionMatches = hasSelection && dnsSelected == dnsActive && zapretSelected == zapretActive && zapretModeMatches;
 
-            if (selectionMatches && anyActive)
+            if (selectionMatches && anyActive && !forceReconnect)
             {
                 if (ThemedDialog.Show(this,
                         "Отключить выбранные компоненты? DNS будет восстановлен, а zapret остановлен.",
@@ -1591,6 +1595,14 @@ public partial class MainWindow : Window
                 if (zapretActive && !await StopBasicZapretAsync()) return;
                 if (dnsActive && !await ResetBasicDnsAsync()) return;
                 return;
+            }
+
+            if (selectionMatches && anyActive && forceReconnect)
+            {
+                if (zapretActive && !await StopBasicZapretAsync()) return;
+                if (dnsActive && !await ResetBasicDnsAsync()) return;
+                zapretActive = false;
+                dnsActive = false;
             }
 
             var folder = ZapretFolderTextBox.Text.Trim();
@@ -2177,7 +2189,7 @@ public partial class MainWindow : Window
                 ? $"Проверка zapret: {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
                 : "Подготовка проверки zapret…";
             BasicModeStatusText.Foreground = GetAccentBrush();
-            BasicConnectionButtonText.Text = "ПРОВЕРКА…";
+            BasicConnectionButtonText.Text = "Проверка…";
         }
 
         var pendingStatus = progress.Phase == "checking" ? "Проверяется…" : progress.Phase == "failed" ? "Не проверено" : "Ожидает";
