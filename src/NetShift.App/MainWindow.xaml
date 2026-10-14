@@ -210,7 +210,17 @@
                   <Ellipse.RenderTransform><ScaleTransform x:Name="PowerHaloScale" /></Ellipse.RenderTransform>
                   <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="22" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
                 </Ellipse>
+                <Ellipse x:Name="BasicPowerOrbit" Width="226" Height="202" Fill="Transparent"
+                         Stroke="{StaticResource AccentBrush}" StrokeThickness="1.8" StrokeDashArray="1.6 7.4"
+                         StrokeDashCap="Round" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                  <Ellipse.RenderTransform><RotateTransform x:Name="PowerOrbitRotation" /></Ellipse.RenderTransform>
+                  <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="8" ShadowDepth="0" Opacity="0.55" /></Ellipse.Effect>
+                </Ellipse>
                 <Ellipse Width="206" Height="184" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0.78" />
+                <Ellipse x:Name="BasicPowerRipple" Width="206" Height="184" Fill="Transparent"
+                         Stroke="{StaticResource AccentBrush}" StrokeThickness="2.5" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                  <Ellipse.RenderTransform><ScaleTransform x:Name="PowerRippleScale" /></Ellipse.RenderTransform>
+                </Ellipse>
                 <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click" Width="188" Height="188"
                         Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Cursor="Hand" ToolTip="{Binding ElementName=BasicConnectionButtonText, Path=Text}"

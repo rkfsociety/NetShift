@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private BitmapSource? _powerButtonOff;
     private BitmapSource? _powerButtonOn;
     private bool _powerHaloAnimating;
+    private int _powerHaloAnimationRevision;
 
     public MainWindow() : this(screenshotPreview: false, screenshotPage: null)
     {
@@ -77,7 +78,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.080";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.082";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -345,33 +346,167 @@ public partial class MainWindow : Window
     {
         if (_powerHaloAnimating == active) return;
         _powerHaloAnimating = active;
+        var revision = ++_powerHaloAnimationRevision;
         var scale = (ScaleTransform)BasicPowerHalo.RenderTransform;
         var glow = (System.Windows.Media.Effects.DropShadowEffect)BasicPowerHalo.Effect;
+        var orbitRotation = (RotateTransform)BasicPowerOrbit.RenderTransform;
+        var rippleScale = (ScaleTransform)BasicPowerRipple.RenderTransform;
+        var easing = new System.Windows.Media.Animation.CubicEase
+        {
+            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+        };
+        var transitionDuration = TimeSpan.FromMilliseconds(420);
+
         if (!active)
         {
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty, null);
-            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, null);
-            BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, null);
-            BasicPowerHalo.Opacity = 0;
-            scale.ScaleX = scale.ScaleY = 1;
-            glow.BlurRadius = 14;
-            glow.Opacity = 0;
+            var haloFade = new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0, transitionDuration)
+            {
+                EasingFunction = easing
+            };
+            haloFade.Completed += (_, _) =>
+            {
+                if (revision != _powerHaloAnimationRevision || _powerHaloAnimating) return;
+
+                BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, null);
+                BasicPowerHalo.Opacity = 0;
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                scale.ScaleX = scale.ScaleY = 1;
+                glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty, null);
+                glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, null);
+                glow.BlurRadius = 14;
+                glow.Opacity = 0;
+                BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty, null);
+                BasicPowerOrbit.Opacity = 0;
+                orbitRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+                orbitRotation.Angle = 0;
+                BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty, null);
+                BasicPowerRipple.Opacity = 0;
+                rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                rippleScale.ScaleX = rippleScale.ScaleY = 1;
+            };
+            BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, haloFade);
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1, transitionDuration) { EasingFunction = easing });
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1, transitionDuration) { EasingFunction = easing });
+            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 14, transitionDuration) { EasingFunction = easing });
+            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0, transitionDuration) { EasingFunction = easing });
+            BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(BasicPowerOrbit.Opacity, 0, transitionDuration) { EasingFunction = easing });
+            orbitRotation.BeginAnimation(RotateTransform.AngleProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(orbitRotation.Angle, orbitRotation.Angle + 12, transitionDuration) { EasingFunction = easing });
+            BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(BasicPowerRipple.Opacity, 0, transitionDuration) { EasingFunction = easing });
+            rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(rippleScale.ScaleX, 1, transitionDuration) { EasingFunction = easing });
+            rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(rippleScale.ScaleY, 1, transitionDuration) { EasingFunction = easing });
             return;
         }
 
-        var duration = TimeSpan.FromSeconds(1.3);
+        var pulseEasing = new System.Windows.Media.Animation.SineEase
+        {
+            EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut
+        };
+        var orbitAngle = orbitRotation.Angle;
+        var pulseDuration = TimeSpan.FromSeconds(3.2);
         var repeat = System.Windows.Media.Animation.RepeatBehavior.Forever;
-        var scalePulse = new System.Windows.Media.Animation.DoubleAnimation(1, 1.14, duration) { AutoReverse = true, RepeatBehavior = repeat };
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty, scalePulse);
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty, scalePulse);
+        var haloEntry = new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0.38, transitionDuration)
+        {
+            EasingFunction = easing
+        };
+        haloEntry.Completed += (_, _) => StartPowerHaloBreathing(revision, pulseDuration, repeat, pulseEasing);
+        BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, haloEntry);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1.04, transitionDuration) { EasingFunction = easing });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1.04, transitionDuration) { EasingFunction = easing });
         glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(12, 25, duration) { AutoReverse = true, RepeatBehavior = repeat });
+            new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 18, transitionDuration) { EasingFunction = easing });
         glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.25, 0.75, duration) { AutoReverse = true, RepeatBehavior = repeat });
+            new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0.38, transitionDuration) { EasingFunction = easing });
+
+        BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(BasicPowerOrbit.Opacity, 0.46, transitionDuration) { EasingFunction = easing });
+        orbitRotation.BeginAnimation(RotateTransform.AngleProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(orbitAngle, orbitAngle + 360, TimeSpan.FromSeconds(22))
+            {
+                RepeatBehavior = repeat
+            });
+
+        var rippleDuration = TimeSpan.FromMilliseconds(860);
+        var rippleOpacity = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+        {
+            Duration = rippleDuration,
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+        };
+        rippleOpacity.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(0.54,
+            System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130)))
+        {
+            EasingFunction = easing
+        });
+        rippleOpacity.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(0,
+            System.Windows.Media.Animation.KeyTime.FromTimeSpan(rippleDuration))
+        {
+            EasingFunction = new System.Windows.Media.Animation.CubicEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn
+            }
+        });
+        BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty, rippleOpacity);
+        rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.9, 1.25, rippleDuration) { EasingFunction = easing });
+        rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.9, 1.25, rippleDuration) { EasingFunction = easing });
+    }
+
+    private void StartPowerHaloBreathing(int revision, TimeSpan duration,
+        System.Windows.Media.Animation.RepeatBehavior repeat,
+        System.Windows.Media.Animation.SineEase easing)
+    {
+        if (revision != _powerHaloAnimationRevision || !_powerHaloAnimating) return;
+
+        var scale = (ScaleTransform)BasicPowerHalo.RenderTransform;
+        var glow = (System.Windows.Media.Effects.DropShadowEffect)BasicPowerHalo.Effect;
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1.08, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = repeat,
+                EasingFunction = easing
+            });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1.08, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = repeat,
+                EasingFunction = easing
+            });
+        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 24, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = repeat,
+                EasingFunction = easing
+            });
+        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0.62, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = repeat,
+                EasingFunction = easing
+            });
         BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.15, 0.8, duration) { AutoReverse = true, RepeatBehavior = repeat });
+            new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0.54, duration)
+            {
+                AutoReverse = true,
+                RepeatBehavior = repeat,
+                EasingFunction = easing
+            });
     }
 
     private void UpdateBasicModeStatus()
