@@ -185,7 +185,7 @@ public partial class MainWindow : Window
         DnsServiceIndicator.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(38, 205, 145));
         RemoveDnsServiceButton.IsEnabled = true;
         InstallDnsServiceButton.Visibility = Visibility.Collapsed;
-        UpdateButton.Content = "Обновление в релизной сборке";
+        UpdateButton.Content = "Только в релизе";
         UpdateButton.IsEnabled = false;
         UpdateButton.ToolTip = null;
         UpdateStatusText.Text = $"Текущая версия: {appVersion}";
@@ -234,9 +234,17 @@ public partial class MainWindow : Window
         NavigateToPage(page);
     }
 
-    private void ToggleMode_Click(object sender, RoutedEventArgs e)
+    private void ModeSelection_Click(object sender, RoutedEventArgs e)
     {
-        NavigateToPage(BasicPage.Visibility == Visibility.Visible ? "dns" : "basic");
+        var selectedMode = (sender as FrameworkElement)?.Tag?.ToString();
+        if (selectedMode == "basic")
+        {
+            NavigateToPage("basic");
+            return;
+        }
+
+        if (selectedMode == "advanced" && BasicPage.Visibility == Visibility.Visible)
+            NavigateToPage("dns");
     }
 
     private void NavigateToPage(string page, bool persistSelection = true)
@@ -253,7 +261,7 @@ public partial class MainWindow : Window
             Width = targetWidth;
         }
         SidebarPanel.Visibility = isBasicMode ? Visibility.Collapsed : Visibility.Visible;
-        SidebarColumn.Width = isBasicMode ? new GridLength(0) : new GridLength(272);
+        SidebarColumn.Width = isBasicMode ? new GridLength(0) : new GridLength(240);
 
         BasicPage.Visibility = isBasicMode ? Visibility.Visible : Visibility.Collapsed;
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
@@ -266,9 +274,8 @@ public partial class MainWindow : Window
             "settings" => "Настройки",
             _ => "DNS"
         };
-        ModeToggleButton.Content = page == "basic" ? "Расширенный режим →" : "Базовый режим ←";
-
-        SetNavigationButtonState(BasicNavigationButton, page == "basic");
+        SetModeButtonState(BasicModeButton, isBasicMode);
+        SetModeButtonState(AdvancedModeButton, !isBasicMode);
         SetNavigationButtonState(DnsNavigationButton, page == "dns");
         SetNavigationButtonState(ZapretNavigationButton, page == "zapret");
         SetNavigationButtonState(SettingsNavigationButton, page == "settings");
@@ -299,13 +306,23 @@ public partial class MainWindow : Window
 
     private void SetNavigationButtonState(System.Windows.Controls.Button button, bool isSelected)
     {
-        var transparentIdle = button == SettingsNavigationButton;
         button.Background = (System.Windows.Media.Brush)FindResource(isSelected
             ? "NavSelectedBrush"
-            : transparentIdle ? "SidebarBrush" : "PanelBrush");
+            : "PanelBrush");
         button.BorderBrush = isSelected
             ? (System.Windows.Media.Brush)FindResource("AccentBrush")
             : System.Windows.Media.Brushes.Transparent;
+        button.Foreground = isSelected
+            ? System.Windows.Media.Brushes.White
+            : (System.Windows.Media.Brush)FindResource("MutedBrush");
+    }
+
+    private void SetModeButtonState(System.Windows.Controls.Button button, bool isSelected)
+    {
+        button.Background = isSelected
+            ? (System.Windows.Media.Brush)FindResource("NavSelectedBrush")
+            : System.Windows.Media.Brushes.Transparent;
+        button.BorderBrush = System.Windows.Media.Brushes.Transparent;
         button.Foreground = isSelected
             ? System.Windows.Media.Brushes.White
             : (System.Windows.Media.Brush)FindResource("MutedBrush");
@@ -1224,7 +1241,7 @@ public partial class MainWindow : Window
         if (NetShiftUpdateService.Repository is null)
         {
             UpdateStatusText.Text = $"Текущая версия: {NetShiftUpdateService.CurrentVersion}";
-            UpdateButton.Content = "Обновление в релизной сборке";
+            UpdateButton.Content = "Только в релизе";
             UpdateButton.IsEnabled = false;
             UpdateButton.ToolTip = null;
             Grid.SetColumnSpan(UpdateButton, 2);

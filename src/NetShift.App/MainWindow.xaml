@@ -38,53 +38,34 @@
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-      <ColumnDefinition x:Name="SidebarColumn" Width="272" />
+      <ColumnDefinition x:Name="SidebarColumn" Width="240" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
       <Border x:Name="SidebarPanel" Grid.Column="0" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}"
-              BorderThickness="0,0,1,0" Padding="20,28,18,20">
-        <DockPanel LastChildFill="True">
-          <StackPanel DockPanel.Dock="Top">
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,42">
-              <Border Width="58" Height="58" CornerRadius="15" Background="{StaticResource LogoBrush}"
-                      BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
-                <TextBlock Text="N" Foreground="White" FontSize="34" FontWeight="Bold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Border>
-              <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
-                <TextBlock Text="NetShift" FontSize="29" FontWeight="Bold" />
-                <TextBlock Text="Сеть под контролем" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="1,1,0,0" />
-              </StackPanel>
-            </StackPanel>
-            <Button x:Name="BasicNavigationButton" Tag="basic" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" Background="{StaticResource NavSelectedBrush}"
-                    BorderBrush="{StaticResource AccentBrush}" Foreground="{StaticResource TextBrush}">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="Базовый режим" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
-            </Button>
+              BorderThickness="0,0,1,0" Padding="16,18,16,16">
+        <StackPanel>
             <Button x:Name="DnsNavigationButton" Tag="dns" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" Margin="0,10,0,0"
+                    Style="{StaticResource NavigationButtonStyle}"
                     Background="{StaticResource PanelBrush}" BorderBrush="Transparent" Foreground="{StaticResource MutedBrush}">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="DNS" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,12,0"/><TextBlock Text="DNS" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
             </Button>
             <Button x:Name="ZapretNavigationButton" Tag="zapret" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" Margin="0,10,0,0"
+                    Style="{StaticResource NavigationButtonStyle}" Margin="0,4,0,0"
                     Background="{StaticResource PanelBrush}" BorderBrush="Transparent" Foreground="{StaticResource MutedBrush}">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="zapret" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,12,0"/><TextBlock Text="zapret" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-          </StackPanel>
-          <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,2">
-            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
             <Button x:Name="SettingsNavigationButton" Tag="settings" Click="NavigatePage_Click"
-                    Style="{StaticResource NavigationButtonStyle}" MinHeight="58" Padding="18,12"
-                    Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="21" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,14,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+                    Style="{StaticResource NavigationButtonStyle}" Margin="0,4,0,0"
+                    Background="{StaticResource PanelBrush}" Foreground="{StaticResource MutedBrush}" BorderBrush="Transparent">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,12,0"/><TextBlock Text="Настройки" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
             </Button>
-            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,14" />
+          <StackPanel Margin="0,10,0,0">
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,8" />
             <TextBlock Text="Системные действия подтверждаются Windows."
-                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="2,18,2,0" />
+                       Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="2,6,2,0" />
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="12" Padding="12" Margin="0,14,0,0">
+                    CornerRadius="10" Padding="9" Margin="0,8,0,0">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -92,27 +73,27 @@
                   <StackPanel Grid.Column="1">
                     <TextBlock Text="Служба DNS" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock x:Name="DnsServiceStatusText" Text="Проверка состояния…" Foreground="{StaticResource MutedBrush}"
-                               FontSize="12" TextWrapping="Wrap" />
+                               FontSize="11" TextWrapping="Wrap" />
                   </StackPanel>
                 </Grid>
-                <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="10,6" MinHeight="36" Margin="0,9,0,0" />
+                <Button Content="Обновить статус" Click="RefreshDnsServiceStatus_Click" Padding="8,4" MinHeight="30" Margin="0,6,0,0" />
                 <Grid x:Name="UpdateActionsGrid" Margin="0,7,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <Button x:Name="UpdateButton" Content="Проверить обновления" Click="UpdateButton_Click"
-                          Grid.ColumnSpan="2" Padding="8,6" MinHeight="38" ToolTip="Проверить наличие обновлений NetShift" />
+                          Grid.ColumnSpan="2" Padding="8,4" MinHeight="30" FontSize="12" ToolTip="Проверить наличие обновлений NetShift" />
                   <Button x:Name="InstallUpdateButton" Grid.Column="1" Content="Установить" Click="InstallUpdateButton_Click"
-                          Visibility="Collapsed" Padding="8,6" MinHeight="38" Margin="6,0,0,0" />
+                          Visibility="Collapsed" Padding="8,4" MinHeight="30" Margin="6,0,0,0" />
                 </Grid>
                 <Button x:Name="InstallDnsServiceButton" Content="Установить службу DNS" Click="InstallDnsService_Click"
-                        Visibility="Collapsed" Padding="10,5" MinHeight="34" Margin="0,7,0,0" />
+                        Visibility="Collapsed" Padding="8,4" MinHeight="30" Margin="0,6,0,0" />
                 <Button x:Name="RemoveDnsServiceButton" Content="Удалить службу" Click="RemoveDnsService_Click"
-                        Padding="10,6" MinHeight="36" Margin="0,7,0,0" />
+                        Padding="8,4" MinHeight="30" Margin="0,6,0,0" />
                 <TextBlock x:Name="UpdateStatusText" Text="Проверка обновлений…" Foreground="{StaticResource MutedBrush}"
-                           FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
+                           FontSize="10" TextWrapping="Wrap" Margin="0,5,0,0" />
               </StackPanel>
             </Border>
           </StackPanel>
-        </DockPanel>
+        </StackPanel>
       </Border>
 
       <Grid Grid.Column="1">
@@ -122,8 +103,19 @@
         </Grid.RowDefinitions>
         <Grid Grid.Row="0" Margin="28,14,28,12">
           <TextBlock x:Name="PageTitleText" Text="Базовый режим" FontSize="36" FontWeight="Bold" VerticalAlignment="Center" />
-          <Button x:Name="ModeToggleButton" Content="Расширенный режим →" Click="ToggleMode_Click"
-                  HorizontalAlignment="Right" VerticalAlignment="Center" Padding="12,8" MinHeight="38" />
+          <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="{StaticResource PanelBrush}"
+                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="3">
+            <StackPanel Orientation="Horizontal">
+              <Button x:Name="BasicModeButton" Tag="basic" Content="Базовый" Click="ModeSelection_Click"
+                      Width="82" MinHeight="32" Padding="4,4" FontSize="12" BorderThickness="0"
+                      Background="{StaticResource NavSelectedBrush}" BorderBrush="Transparent" Foreground="{StaticResource TextBrush}"
+                      AutomationProperties.Name="Базовый режим" />
+              <Button x:Name="AdvancedModeButton" Tag="advanced" Content="Расширенный" Click="ModeSelection_Click"
+                      Width="104" MinHeight="32" Padding="4,4" FontSize="12" BorderThickness="0"
+                      Background="Transparent" BorderBrush="Transparent" Foreground="{StaticResource MutedBrush}"
+                      AutomationProperties.Name="Расширенный режим" />
+            </StackPanel>
+          </Border>
         </Grid>
 
       <Grid Grid.Row="1">
