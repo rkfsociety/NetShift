@@ -6,9 +6,9 @@
         ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" PreviewKeyDown="Window_PreviewKeyDown">
   <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-          BorderThickness="1" CornerRadius="12" Padding="1">
+          BorderThickness="1" CornerRadius="4" Padding="1">
     <Border.Effect>
-      <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="7" Opacity="0.42" />
+      <DropShadowEffect Color="#12C8FF" BlurRadius="24" ShadowDepth="2" Opacity="0.18" />
     </Border.Effect>
     <Grid>
       <Grid.RowDefinitions>
@@ -17,7 +17,7 @@
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
-      <Border Grid.Row="0" Background="{StaticResource SidebarBrush}" CornerRadius="11,11,0,0"
+      <Border Grid.Row="0" Background="{StaticResource SidebarBrush}" CornerRadius="3,3,0,0"
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
         <DockPanel LastChildFill="True">
           <Button DockPanel.Dock="Right" Style="{StaticResource WindowCloseButtonStyle}"

@@ -77,7 +77,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.077";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.080";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -130,6 +130,7 @@ public partial class MainWindow : Window
         BasicDnsToggle.IsChecked = _settings.BasicDnsEnabled;
         BasicZapretToggle.IsChecked = _settings.BasicZapretEnabled;
         BasicZapretServiceToggle.IsChecked = _settings.BasicZapretUseService;
+        BasicZapretModeText.Text = _settings.BasicZapretUseService ? "Служба" : "Фон";
         _isSyncingBasicSelectors = false;
         LegacyModeRadio.IsChecked = !_settings.NativeDnsMode;
         NativeModeRadio.IsChecked = _settings.NativeDnsMode;
@@ -175,7 +176,7 @@ public partial class MainWindow : Window
         SupportIPv6CheckBox.IsChecked = true;
         ConfigureVpnAdaptersCheckBox.IsChecked = false;
         BasicDnsToggle.IsChecked = true;
-        BasicZapretToggle.IsChecked = false;
+        BasicZapretToggle.IsChecked = true;
         BasicZapretServiceToggle.IsChecked = true;
 
         AppAutoStartCheckBox.IsChecked = false;
@@ -274,6 +275,11 @@ public partial class MainWindow : Window
             "settings" => "Настройки",
             _ => "DNS"
         };
+        PageTitleText.Visibility = isBasicMode ? Visibility.Collapsed : Visibility.Visible;
+        ModeSelectorBorder.Width = isBasicMode ? 440 : 360;
+        ModeSelectorBorder.HorizontalAlignment = isBasicMode
+            ? System.Windows.HorizontalAlignment.Center
+            : System.Windows.HorizontalAlignment.Right;
         SetModeButtonState(BasicModeButton, isBasicMode);
         SetModeButtonState(AdvancedModeButton, !isBasicMode);
         SetNavigationButtonState(DnsNavigationButton, page == "dns");
@@ -284,11 +290,13 @@ public partial class MainWindow : Window
         {
             if (_isScreenshotPreview)
             {
-                BasicModeStatusText.Text = "Выбор ещё не применён";
-                BasicModeStatusText.Foreground = System.Windows.Media.Brushes.Goldenrod;
+                BasicModeStatusText.Text = "Подключение активно";
+                BasicModeStatusText.Foreground = (System.Windows.Media.Brush)FindResource("SuccessBrush");
+                BasicModeProviderText.Text = "Используется: Cloudflare";
                 BasicConnectionButtonText.Text = "ПЕРЕПОДКЛЮЧИТЬ";
-                BasicModeDetailText.Text = "Нажмите кнопку, чтобы привести DNS и zapret к выбранным переключателям.";
-                BasicPowerButtonFace.Source = _powerButtonOff;
+                BasicModeDetailText.Text = "Нажмите, чтобы обновить DNS и zapret к выбранным переключателям.";
+                BasicPowerButtonFace.Source = _powerButtonOn;
+                UpdatePowerHalo(active: true);
             }
             else
             {
@@ -320,11 +328,11 @@ public partial class MainWindow : Window
     private void SetModeButtonState(System.Windows.Controls.Button button, bool isSelected)
     {
         button.Background = isSelected
-            ? (System.Windows.Media.Brush)FindResource("NavSelectedBrush")
+            ? (System.Windows.Media.Brush)FindResource("AccentDarkBrush")
             : System.Windows.Media.Brushes.Transparent;
-        button.BorderBrush = System.Windows.Media.Brushes.Transparent;
+        button.BorderBrush = (System.Windows.Media.Brush)FindResource(isSelected ? "AccentBrush" : "BorderBrush");
         button.Foreground = isSelected
-            ? System.Windows.Media.Brushes.White
+            ? (System.Windows.Media.Brush)FindResource("TextBrush")
             : (System.Windows.Media.Brush)FindResource("MutedBrush");
     }
 
@@ -364,6 +372,10 @@ public partial class MainWindow : Window
     private void UpdateBasicModeStatus()
     {
         if (BasicConnectionButton is null || BasicDnsToggle is null || BasicZapretToggle is null) return;
+        var providerName = (BasicDnsProviderComboBox.SelectedItem as DnsProvider)?.Name ?? "не выбран";
+        BasicModeProviderText.Text = BasicDnsToggle.IsChecked == true
+            ? $"Выбран: {providerName}"
+            : "DNS отключён";
         if (_isBasicConnectionActionRunning)
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Подготавливаю подключение…";
@@ -373,6 +385,7 @@ public partial class MainWindow : Window
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
             BasicZapretServiceToggle.IsEnabled = false;
+            BasicAutoStrategyToggle.IsEnabled = false;
             BasicDnsProviderComboBox.IsEnabled = false;
             BasicStrategyComboBox.IsEnabled = false;
             return;
@@ -386,6 +399,7 @@ public partial class MainWindow : Window
             BasicDnsToggle.IsEnabled = false;
             BasicZapretToggle.IsEnabled = false;
             BasicZapretServiceToggle.IsEnabled = false;
+            BasicAutoStrategyToggle.IsEnabled = false;
             BasicDnsProviderComboBox.IsEnabled = false;
             BasicStrategyComboBox.IsEnabled = false;
             return;
@@ -394,6 +408,8 @@ public partial class MainWindow : Window
         var zapretSelected = BasicZapretToggle.IsChecked == true;
         var hasSelection = dnsSelected || zapretSelected;
         var dnsActive = IsNetShiftDnsActive();
+        if (dnsActive && BasicDnsToggle.IsChecked == true)
+            BasicModeProviderText.Text = $"Используется: {providerName}";
         var zapretActive = _isZapretServiceRunning || _isManualZapretRunning;
         var anyActive = dnsActive || zapretActive;
         var zapretModeMatches = !zapretSelected || (_settings.BasicZapretUseService
@@ -402,11 +418,11 @@ public partial class MainWindow : Window
         var selectionMatches = hasSelection && dnsSelected == dnsActive && zapretSelected == zapretActive && zapretModeMatches;
 
         BasicModeStatusText.Text = !hasSelection && !anyActive ? "Ничего не выбрано"
-            : selectionMatches ? "Подключено"
-            : anyActive ? "Выбор ещё не применён"
-            : "Отключено";
+            : selectionMatches ? "Подключение активно"
+            : anyActive ? "Конфигурация не применена"
+            : "Подключение выключено";
         BasicModeStatusText.Foreground = selectionMatches
-            ? System.Windows.Media.Brushes.LightGreen
+            ? (System.Windows.Media.Brush)FindResource("SuccessBrush")
             : anyActive
                 ? System.Windows.Media.Brushes.Goldenrod
                 : (System.Windows.Media.Brush)FindResource("MutedBrush");
@@ -423,6 +439,7 @@ public partial class MainWindow : Window
         BasicDnsToggle.IsEnabled = canEdit;
         BasicZapretToggle.IsEnabled = canEdit;
         BasicZapretServiceToggle.IsEnabled = canEdit;
+        BasicAutoStrategyToggle.IsEnabled = canEdit && !zapretActive && BasicStrategyComboBox.Items.Count > 1;
         BasicDnsProviderComboBox.IsEnabled = canEdit && !dnsActive;
         BasicStrategyComboBox.IsEnabled = canEdit && !zapretActive && BasicStrategyComboBox.Items.Count > 1;
 
@@ -724,6 +741,7 @@ public partial class MainWindow : Window
         BasicStrategyComboBox.SelectedItem = _settings.BasicZapretAutoStrategy
             ? choices[0]
             : choices.FirstOrDefault(choice => string.Equals(choice.Path, _settings.BasicZapretStrategyPath, StringComparison.OrdinalIgnoreCase)) ?? choices[0];
+        SetBasicAutoStrategyControls(BasicStrategyComboBox.SelectedItem is BasicStrategyChoice selectedChoice && selectedChoice.IsAutomatic);
         if (BasicStrategyComboBox.SelectedItem is BasicStrategyChoice selected && selected.IsAutomatic != _settings.BasicZapretAutoStrategy)
         {
             _settings.BasicZapretAutoStrategy = true;
@@ -1022,8 +1040,43 @@ public partial class MainWindow : Window
         if (_isSyncingBasicSelectors || BasicStrategyComboBox.SelectedItem is not BasicStrategyChoice choice) return;
         _settings.BasicZapretAutoStrategy = choice.IsAutomatic;
         _settings.BasicZapretStrategyPath = choice.Path;
+        SetBasicAutoStrategyControls(choice.IsAutomatic);
         if (!choice.IsAutomatic) StrategyComboBox.SelectedValue = choice.Path;
         SaveSettings();
+        UpdateBasicModeStatus();
+    }
+
+    private void BasicAutoStrategyToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isScreenshotPreview || _isSyncingBasicSelectors) return;
+        var isAutomatic = BasicAutoStrategyToggle.IsChecked == true;
+        var choice = BasicStrategyComboBox.Items.OfType<BasicStrategyChoice>()
+            .FirstOrDefault(item => item.IsAutomatic == isAutomatic);
+        if (choice is null)
+        {
+            _isSyncingBasicSelectors = true;
+            BasicAutoStrategyToggle.IsChecked = true;
+            _isSyncingBasicSelectors = false;
+            SetBasicAutoStrategyControls(isAutomatic: true);
+            return;
+        }
+
+        _isSyncingBasicSelectors = true;
+        BasicStrategyComboBox.SelectedItem = choice;
+        _isSyncingBasicSelectors = false;
+        SetBasicAutoStrategyControls(isAutomatic);
+        _settings.BasicZapretAutoStrategy = isAutomatic;
+        _settings.BasicZapretStrategyPath = choice.Path;
+        if (!isAutomatic) StrategyComboBox.SelectedValue = choice.Path;
+        SaveSettings();
+        UpdateBasicModeStatus();
+    }
+
+    private void SetBasicAutoStrategyControls(bool isAutomatic)
+    {
+        BasicAutoStrategyToggle.IsChecked = isAutomatic;
+        BasicAutoStrategyNameText.Visibility = isAutomatic ? Visibility.Visible : Visibility.Collapsed;
+        BasicStrategyComboBox.Visibility = isAutomatic ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void BasicModuleToggle_Click(object sender, RoutedEventArgs e)
@@ -1040,6 +1093,7 @@ public partial class MainWindow : Window
     {
         if (_isBasicConnectionActionRunning) return;
         _settings.BasicZapretUseService = BasicZapretServiceToggle.IsChecked == true;
+        BasicZapretModeText.Text = _settings.BasicZapretUseService ? "Служба" : "Фон";
         SaveSettings();
         UpdateBasicModeStatus();
     }
