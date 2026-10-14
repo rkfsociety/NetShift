@@ -40,7 +40,7 @@ public static class NetShiftUpdateService
             if (versionMatch.Success) return versionMatch.Groups["version"].Value;
 
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version?.ToString(3) ?? "0.3.075";
+            return version?.ToString(3) ?? "0.3.076";
         }
     }
 
@@ -118,7 +118,7 @@ public static class NetShiftUpdateService
         "$startInfo.Arguments = '--confirm-update \"' + $backup + '\"'; $newProcess = [Diagnostics.Process]::Start($startInfo); " +
         "if (-not $newProcess.WaitForInputIdle(30000)) { throw 'Новая версия не завершила запуск за отведённое время.' }; " +
         "for ($attempt = 0; $attempt -lt 120 -and (Test-Path -LiteralPath $backup); $attempt++) { " +
-        "if ($newProcess.HasExited) { throw 'Новая версия завершилась до подтверждения запуска.' }; Start-Sleep -Milliseconds 500 }; " +
+        "if ($newProcess.HasExited) { $newProcess.Refresh(); throw ('Новая версия завершилась до подтверждения запуска (код завершения: ' + $newProcess.ExitCode + ').') }; Start-Sleep -Milliseconds 500 }; " +
         "if (Test-Path -LiteralPath $backup) { throw 'Новая версия не подтвердила успешный запуск за отведённое время.' }; " +
         "} catch { " +
         "if ($null -ne $newProcess -and -not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force -ErrorAction SilentlyContinue; try { $newProcess.WaitForExit(15000) } catch {} }; " +

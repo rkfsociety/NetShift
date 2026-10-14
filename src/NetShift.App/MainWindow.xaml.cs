@@ -1329,7 +1329,7 @@ public partial class MainWindow : Window
 
     private async Task<bool> StopLegacyDnsAndRestoreAsync()
     {
-        if (_legacyAdapterIndex is not null)
+        if (_legacyAdapterIndex is not null || IsDnsRegistryProfileActive(@"SOFTWARE\NetShift\LegacyDns"))
         {
             if (!await RunElevatedWorkerAsync("dns-legacy-restore")) return false;
             _legacyAdapterIndex = null;

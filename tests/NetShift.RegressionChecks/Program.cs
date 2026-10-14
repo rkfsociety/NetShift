@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using NetShift.App.Models;
 using NetShift.App.Services;
+using NetShift.DnsService;
 
 CheckDnsProviderAddressEditing();
 CheckZapretTargetParsing();
@@ -11,6 +12,7 @@ CheckZapretCurlModesAndRanking();
 CheckZapretStrategyRankingPersistence();
 CheckBackupIsIdempotent();
 CheckAdapterLookupWithStringGuid();
+CheckDnsProfileAdapterLookupWithStringGuid();
 CheckBackupSurvivesMissingAdapter();
 CheckDnsRestore(true, true, "reset");
 CheckDnsRestore(false, true, "reset,ipv4=1.1.1.1");
@@ -168,6 +170,18 @@ static void CheckAdapterLookupWithStringGuid()
     RunPowerShell(script);
 }
 
+static void CheckDnsProfileAdapterLookupWithStringGuid()
+{
+    const string expectedGuid = "11111111-1111-1111-1111-111111111111";
+    var script = "$script:Adapters=@(" +
+                 "[pscustomobject]@{InterfaceGuid='22222222-2222-2222-2222-222222222222';InterfaceIndex=7}," +
+                 "[pscustomobject]@{InterfaceGuid='{11111111-1111-1111-1111-111111111111}';InterfaceIndex=12}); " +
+                 "function Get-NetAdapter { [CmdletBinding()] param([switch]$IncludeHidden) $script:Adapters }; " +
+                 $"$guid=[guid]'{expectedGuid}';" + DnsProfileScriptFragments.FindAdapterByGuid +
+                 "if($null -eq $adapter -or $adapter.InterfaceIndex -ne 12){throw 'The Native DNS adapter GUID string was not resolved.'}";
+    RunPowerShell(script);
+}
+
 static void CheckDnsRestore(bool dhcp4, bool dhcp6, string expectedCalls)
 {
     var script = "$script:Calls=[System.Collections.Generic.List[string]]::new();" +
@@ -238,6 +252,7 @@ static void CheckUpdateConfirmation()
         updaterScript.Contains("Get-FileHash", StringComparison.Ordinal) ||
         !updaterScript.Contains("Get-Sha256Hex", StringComparison.Ordinal) ||
         !updaterScript.Contains("--update-failed", StringComparison.Ordinal) ||
+        !updaterScript.Contains("$newProcess.ExitCode", StringComparison.Ordinal) ||
         updaterScript.Contains("[System.Windows.MessageBox]::Show", StringComparison.Ordinal))
         throw new InvalidOperationException("The updater no longer verifies, confirms, and rolls back its installation.");
     var nestedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(updaterScript));

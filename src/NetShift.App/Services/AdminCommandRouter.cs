@@ -101,9 +101,9 @@ public static class AdminCommandRouter
                     RunPowerShell("$profile = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\NetShift\\Dns', $true); " +
                         "if ($null -ne $profile) { try { if ([int]$profile.GetValue('Enabled', 0) -eq 1) { " +
                         "$guid = [guid]$profile.GetValue('InterfaceGuid'); " +
-                        "$adapter = Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.InterfaceGuid -eq $guid } | Select-Object -First 1; " +
-                        "if ($null -eq $adapter) { throw 'Сетевой адаптер из профиля NetShift не найден.' }; " +
-                        "Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses -ErrorAction Stop; " +
+                        LegacyDnsScriptFragments.FindAdapterByGuid +
+                        "if ($null -eq $a) { throw 'Сетевой адаптер из профиля NetShift не найден.' }; " +
+                        "Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ResetServerAddresses -ErrorAction Stop; " +
                         "$revision = [long]$profile.GetValue('Revision', 0); $profile.SetValue('Enabled', 0, [Microsoft.Win32.RegistryValueKind]::DWord); " +
                         "$profile.SetValue('Revision', ($revision + 1), [Microsoft.Win32.RegistryValueKind]::QWord) } } finally { $profile.Dispose() } }");
                     break;

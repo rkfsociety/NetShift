@@ -96,7 +96,7 @@ internal sealed class DnsProfileWorker(ILogger<DnsProfileWorker> logger) : Backg
     {
         var script = new StringBuilder("$ErrorActionPreference = 'Stop'; ")
             .Append("$guid = [guid]").Append(PsLiteral(profile.InterfaceGuid.ToString("D"))).Append("; ")
-            .Append("$adapter = Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.InterfaceGuid -eq $guid } | Select-Object -First 1; ")
+            .Append(DnsProfileScriptFragments.FindAdapterByGuid)
             .Append("if ($null -eq $adapter) { throw 'Сетевой адаптер из DNS-профиля пока не найден.' }; ");
 
         if (profile.DohTemplate.Length > 0)

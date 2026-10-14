@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\NetShift.App\Services\LegacyDnsScriptFragments.cs" Link="LegacyDnsScriptFragments.cs" />
+    <Compile Include="..\..\src\NetShift.DnsService\DnsProfileScriptFragments.cs" Link="DnsProfileScriptFragments.cs" />
     <Compile Include="..\..\src\NetShift.App\Services\ProcessExecutionService.cs" Link="ProcessExecutionService.cs" />
     <Compile Include="..\..\src\NetShift.App\Services\NetShiftUpdateService.cs" Link="NetShiftUpdateService.cs" />
     <Compile Include="..\..\src\NetShift.App\Services\ZapretConnectivityTester.cs" Link="ZapretConnectivityTester.cs" />
