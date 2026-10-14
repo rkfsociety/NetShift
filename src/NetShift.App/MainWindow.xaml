@@ -17,7 +17,7 @@
     <Border Grid.RowSpan="2" Background="{StaticResource CanvasBrush}"
             BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
 
-    <Grid Grid.Row="0" Background="#08111E" Panel.ZIndex="1">
+    <Grid Grid.Row="0" Background="{StaticResource SidebarBrush}" Panel.ZIndex="1">
       <DockPanel LastChildFill="False">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
           <Image Source="Assets/NetShift.ico" Width="18" Height="18" Stretch="Uniform" />
@@ -48,7 +48,7 @@
           <StackPanel DockPanel.Dock="Top">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,42">
               <Border Width="58" Height="58" CornerRadius="15" Background="{StaticResource LogoBrush}"
-                      BorderBrush="#14B8E8" BorderThickness="1">
+                      BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
                 <TextBlock Text="N" Foreground="White" FontSize="34" FontWeight="Bold"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
@@ -59,7 +59,7 @@
             </StackPanel>
             <Button x:Name="BasicNavigationButton" Tag="basic" Click="NavigatePage_Click"
                     Style="{StaticResource NavigationButtonStyle}" Background="{StaticResource NavSelectedBrush}"
-                    BorderBrush="#1787F5" Foreground="White">
+                    BorderBrush="{StaticResource AccentBrush}" Foreground="{StaticResource TextBrush}">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Margin="0,0,16,0"/><TextBlock Text="Базовый режим" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" VerticalAlignment="Center"/></StackPanel>
             </Button>
             <Button x:Name="DnsNavigationButton" Tag="dns" Click="NavigatePage_Click"
@@ -133,7 +133,7 @@
                     BorderThickness="1" CornerRadius="18" Padding="24" Margin="0,0,0,16">
               <StackPanel>
                 <TextBlock Text="Быстрое подключение" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                <Border Background="#182B40" CornerRadius="12" Padding="12,5"
+                <Border Background="{StaticResource PanelRaisedBrush}" CornerRadius="12" Padding="12,5"
                         HorizontalAlignment="Center" Margin="0,10,0,14">
                   <StackPanel Orientation="Horizontal">
                     <Ellipse Width="6" Height="6" Margin="0,0,7,0" VerticalAlignment="Center"
@@ -144,11 +144,11 @@
                 </Border>
                 <StackPanel HorizontalAlignment="Center" Margin="0,0,0,4">
                   <Grid Width="184" Height="184">
-                    <Ellipse Width="172" Height="172" Stroke="#24445B" StrokeThickness="1" />
+                    <Ellipse Width="172" Height="172" Stroke="{StaticResource BorderBrush}" StrokeThickness="1" />
                     <Ellipse x:Name="BasicPowerHalo" Width="142" Height="142" Fill="Transparent"
-                             Stroke="#00C8FF" StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                             Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
                       <Ellipse.RenderTransform><ScaleTransform x:Name="PowerHaloScale" /></Ellipse.RenderTransform>
-                      <Ellipse.Effect><DropShadowEffect Color="#00C8FF" BlurRadius="14" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
+                      <Ellipse.Effect><DropShadowEffect Color="#08B8D1" BlurRadius="14" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
                     </Ellipse>
                     <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click" Width="142" Height="142"
                             Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -158,7 +158,7 @@
                         <ControlTemplate TargetType="Button">
                           <Grid x:Name="PowerSurface" RenderTransformOrigin="0.5,0.5">
                             <Grid.RenderTransform><ScaleTransform /></Grid.RenderTransform>
-                            <Ellipse x:Name="FocusRing" Stroke="#8FE9FF" StrokeThickness="2" Margin="-4" Visibility="Collapsed" />
+                            <Ellipse x:Name="FocusRing" Stroke="#9BE3EA" StrokeThickness="2" Margin="-4" Visibility="Collapsed" />
                             <ContentPresenter />
                           </Grid>
                           <ControlTemplate.Triggers>
@@ -185,7 +185,7 @@
                   <TextBlock x:Name="BasicConnectionButtonText" Text="ВКЛЮЧИТЬ" FontSize="15" FontWeight="SemiBold"
                              HorizontalAlignment="Center" Margin="0,6,0,0" />
                 </StackPanel>
-                <Border Height="1" Background="#24384E" Margin="12,18,12,0" />
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="12,18,12,0" />
                 <TextBlock x:Name="BasicModeDetailText" Text="Выберите DNS и/или zapret. При включении zapret NetShift проверит весь список стратегий и запустит лучшую."
                            Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
                            LineHeight="20" MaxWidth="390" HorizontalAlignment="Center" Margin="8,14,8,0" />
@@ -281,7 +281,7 @@
                     <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=LegacyModeRadio}" Value="True"><Setter Property="Background" Value="{StaticResource AccentDarkBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Border.Style>
                     <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" IsChecked="True" Foreground="White">
                       <StackPanel Margin="6,0,0,0"><TextBlock Text="Legacy: локальный прокси" FontSize="17" FontWeight="SemiBold" />
-                        <TextBlock Text="Локальный прокси шифрует DNS через DoH." Foreground="#A9BCD8" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
+                        <TextBlock Text="Локальный прокси шифрует DNS через DoH." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
                     </RadioButton>
                   </Border>
                   <Border x:Name="NativeModeCard" Grid.Column="2" CornerRadius="12" Padding="14">
@@ -310,7 +310,7 @@
                 <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,18,0,14" />
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="#062033"
+                  <Button Content="Применить DNS" Background="{StaticResource AccentBrush}" Foreground="#08252A"
                           BorderBrush="{StaticResource AccentBrush}" Click="ApplyDns_Click" MinHeight="48" FontSize="17" />
                   <Button Grid.Column="2" Content="Вернуть DHCP" Click="ResetDns_Click" MinHeight="48" FontSize="17" />
                 </Grid>
@@ -334,7 +334,7 @@
                                Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,4,10,0" />
                   </StackPanel>
                   <Button x:Name="DownloadLatestButton" Grid.Column="1" Content="Скачать последний релиз"
-                          Background="{StaticResource AccentBrush}" Foreground="#07151A" BorderBrush="{StaticResource AccentBrush}"
+                          Background="{StaticResource AccentBrush}" Foreground="#08252A" BorderBrush="{StaticResource AccentBrush}"
                           Click="DownloadLatest_Click" Padding="14,8" MinHeight="38" />
                 </Grid>
                 <ProgressBar x:Name="DownloadProgressBar" Height="5" Minimum="0" Maximum="100" Visibility="Collapsed" />
@@ -388,7 +388,7 @@
                     </ComboBox.ItemTemplate>
                   </ComboBox>
                   <WrapPanel Margin="0,10,0,0">
-                    <Button x:Name="StartStrategyButton" Content="Запустить стратегию" Background="{StaticResource AccentBrush}" Foreground="#07151A"
+                    <Button x:Name="StartStrategyButton" Content="Запустить стратегию" Background="{StaticResource AccentBrush}" Foreground="#08252A"
                             BorderBrush="{StaticResource AccentBrush}" Click="StartStrategy_Click" Padding="12,8" MinHeight="38" />
                     <Button x:Name="StopStrategyButton" Content="Остановить вручную" Click="StopStrategy_Click" Margin="8,0,0,0" Padding="12,8" MinHeight="38" />
                   </WrapPanel>
@@ -581,7 +581,7 @@
                 <Grid Margin="0,14,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                   <Border Width="48" Height="48" CornerRadius="12" Background="{StaticResource LogoBrush}"
-                          BorderBrush="#14B8E8" BorderThickness="1">
+                          BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
                     <TextBlock Text="N" Foreground="White" FontSize="28" FontWeight="Bold"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Border>

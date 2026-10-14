@@ -55,26 +55,41 @@ public partial class MainWindow : Window
     private readonly List<ZapretStrategyRanking> _currentZapretStrategyRankings = [];
     private bool _isZapretRankedCandidateCheck;
     private string? _rankedCandidatePath;
+    private readonly bool _isScreenshotPreview;
     private BitmapSource? _powerButtonOff;
     private BitmapSource? _powerButtonOn;
     private bool _powerHaloAnimating;
 
-    public MainWindow()
+    public MainWindow() : this(screenshotPreview: false, screenshotPage: null)
     {
+    }
+
+    public MainWindow(bool screenshotPreview, string? screenshotPage = null)
+    {
+        _isScreenshotPreview = screenshotPreview;
         InitializeComponent();
         var buttonSprite = new BitmapImage(new Uri("pack://application:,,,/NetShift;component/Assets/BasicPowerButtons.png"));
         _powerButtonOff = new CroppedBitmap(buttonSprite, new Int32Rect(325, 90, 600, 600));
         _powerButtonOn = new CroppedBitmap(buttonSprite, new Int32Rect(1050, 90, 600, 600));
         BasicPowerButtonFace.Source = _powerButtonOff;
-        AboutVersionText.Text = $"Версия NetShift {NetShiftUpdateService.CurrentVersion}";
-        _trayIcon = CreateTrayIcon();
-        SourceInitialized += (_, _) => ApplyDarkTitleBar();
-        Closing += MainWindow_Closing;
+        var appVersion = screenshotPreview
+            ? Regex.Match(typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty,
+                "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
+            : NetShiftUpdateService.CurrentVersion;
+        if (string.IsNullOrWhiteSpace(appVersion))
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.077";
+        AboutVersionText.Text = $"Версия NetShift {appVersion}";
+        _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
+        if (!screenshotPreview)
+        {
+            SourceInitialized += (_, _) => ApplyDarkTitleBar();
+            Closing += MainWindow_Closing;
+            Loaded += MainWindow_Loaded;
+            System.Windows.Application.Current.SessionEnding += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
+        }
         Closed += (_, _) => DisposeTrayIcon();
-        System.Windows.Application.Current.SessionEnding += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
         ProviderComboBox.ItemsSource = _dnsProviders;
         BasicDnsProviderComboBox.ItemsSource = _dnsProviders;
-        Loaded += MainWindow_Loaded;
         GameFilterModeComboBox.ItemsSource = new[]
         {
             new PackageChoice("Выключен", "disabled"),
@@ -100,6 +115,13 @@ public partial class MainWindow : Window
         FakeTargetComboBox.DisplayMemberPath = nameof(PackageChoice.Name);
         FakeTargetComboBox.SelectedValuePath = nameof(PackageChoice.Value);
         FakeTargetComboBox.SelectedIndex = 0;
+
+        if (screenshotPreview)
+        {
+            InitializeScreenshotPreview(screenshotPage ?? "dns", appVersion);
+            return;
+        }
+
         LoadSettings();
         ProviderComboBox.SelectedItem = _dnsProviders.FirstOrDefault(provider =>
             provider.Name.Equals(_settings.DnsProviderName ?? "DNS-AI", StringComparison.OrdinalIgnoreCase)) ?? _dnsProviders[0];
@@ -123,6 +145,87 @@ public partial class MainWindow : Window
         _ = RefreshDnsServiceStatusAsync();
         RefreshAdapters(selectFirst: true);
         RefreshZapretFolder();
+    }
+
+    private void InitializeScreenshotPreview(string page, string appVersion)
+    {
+        var provider = _dnsProviders.First(candidate => candidate.Name == "Cloudflare");
+        _isSyncingBasicSelectors = true;
+        ProviderComboBox.SelectedItem = provider;
+        BasicDnsProviderComboBox.SelectedItem = provider;
+        _isSyncingBasicSelectors = false;
+        AdapterComboBox.ItemsSource = new[]
+        {
+            new NetworkAdapterInfo
+            {
+                Name = "Ethernet",
+                Description = "Ethernet adapter",
+                Status = "Подключено",
+                InterfaceIndex = 1
+            }
+        };
+        AdapterComboBox.SelectedIndex = 0;
+        Ipv4TextBox.Text = provider.Ipv4;
+        Ipv6TextBox.Text = provider.Ipv6;
+        Ipv4AlternateTextBox.Text = string.Empty;
+        Ipv6AlternateTextBox.Text = string.Empty;
+        DohTemplateTextBox.Text = provider.DohTemplate ?? string.Empty;
+        LegacyModeRadio.IsChecked = false;
+        NativeModeRadio.IsChecked = true;
+        SupportIPv6CheckBox.IsChecked = true;
+        ConfigureVpnAdaptersCheckBox.IsChecked = false;
+        BasicDnsToggle.IsChecked = true;
+        BasicZapretToggle.IsChecked = false;
+        BasicZapretServiceToggle.IsChecked = true;
+
+        AppAutoStartCheckBox.IsChecked = false;
+        AppAutoStartStatusText.Text = "Выключен";
+        DnsServiceStatusText.Text = "Работает · автозапуск Windows";
+        DnsServiceStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        DnsServiceIndicator.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(38, 205, 145));
+        RemoveDnsServiceButton.IsEnabled = true;
+        InstallDnsServiceButton.Visibility = Visibility.Collapsed;
+        UpdateButton.Content = "Обновление в релизной сборке";
+        UpdateButton.IsEnabled = false;
+        UpdateButton.ToolTip = null;
+        UpdateStatusText.Text = $"Текущая версия: {appVersion}";
+
+        var sampleFolder = @"C:\NetShift\zapret-1.8.2";
+        var sampleStrategyPath = Path.Combine(sampleFolder, "general (ALT).bat");
+        var sampleStrategy = new StrategyItem("general (ALT)", sampleStrategyPath, ZapretStrategyHealthStatus.Green, true);
+        ZapretFolderTextBox.Text = sampleFolder;
+        StrategyComboBox.ItemsSource = new[] { sampleStrategy };
+        StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
+        StrategyComboBox.SelectedValue = sampleStrategyPath;
+        BasicStrategyComboBox.ItemsSource = new[]
+        {
+            new BasicStrategyChoice("Автовыбор — лучшая по сохранённому рейтингу", null, true),
+            new BasicStrategyChoice(sampleStrategy.Name, sampleStrategy.Path, false)
+        };
+        BasicStrategyComboBox.SelectedIndex = 0;
+        DownloadStatusText.Text = "Пакет установлен · демонстрационные данные";
+        ZapretStatusText.Text = "Пакет zapret готов";
+        ManualStrategyStatusText.Text = "Ручной запуск не активен";
+        ServiceStatusText.Text = "Служба остановлена";
+        ZapretServiceToggle.IsChecked = false;
+        ServiceRunButton.Visibility = Visibility.Visible;
+        ServiceRunButton.Content = "Запустить службу";
+        StartStrategyButton.IsEnabled = true;
+        StopStrategyButton.IsEnabled = false;
+        ApplyServiceStrategyButton.IsEnabled = true;
+        ServiceRunButton.IsEnabled = true;
+        StrategyComboBox.IsEnabled = true;
+        CheckActiveStrategyButton.IsEnabled = true;
+        ZapretHealthStatusText.Text = "Проверка стратегий ещё не выполнялась.";
+
+        GameFilterModeComboBox.SelectedValue = "disabled";
+        GameFilterTcpTextBox.Text = "1024-65535";
+        GameFilterUdpTextBox.Text = "1024-65535";
+        IpSetModeComboBox.SelectedValue = "any";
+        FakeFileComboBox.ItemsSource = new[] { "fake_default_tls" };
+        FakeFileComboBox.SelectedIndex = 0;
+
+        NavigateToPage(page, persistSelection: false);
     }
 
     private void NavigatePage_Click(object sender, RoutedEventArgs e)
@@ -169,14 +272,25 @@ public partial class MainWindow : Window
         SetNavigationButtonState(DnsNavigationButton, page == "dns");
         SetNavigationButtonState(ZapretNavigationButton, page == "zapret");
         SetNavigationButtonState(SettingsNavigationButton, page == "settings");
-        if (page == "zapret") _ = RefreshServiceStatusAsync();
+        if (page == "zapret" && !_isScreenshotPreview) _ = RefreshServiceStatusAsync();
         if (page == "basic")
         {
-            UpdateBasicModeStatus();
-            if (IsLoaded) _ = RefreshServiceStatusAsync();
+            if (_isScreenshotPreview)
+            {
+                BasicModeStatusText.Text = "Выбор ещё не применён";
+                BasicModeStatusText.Foreground = System.Windows.Media.Brushes.Goldenrod;
+                BasicConnectionButtonText.Text = "ПЕРЕПОДКЛЮЧИТЬ";
+                BasicModeDetailText.Text = "Нажмите кнопку, чтобы привести DNS и zapret к выбранным переключателям.";
+                BasicPowerButtonFace.Source = _powerButtonOff;
+            }
+            else
+            {
+                UpdateBasicModeStatus();
+                if (IsLoaded) _ = RefreshServiceStatusAsync();
+            }
         }
 
-        if (persistSelection && !string.Equals(_settings.LastSelectedPage, page, StringComparison.Ordinal))
+        if (!_isScreenshotPreview && persistSelection && !string.Equals(_settings.LastSelectedPage, page, StringComparison.Ordinal))
         {
             _settings.LastSelectedPage = page;
             SaveSettings();
@@ -236,7 +350,7 @@ public partial class MainWindow : Window
         if (_isBasicConnectionActionRunning)
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Подготавливаю подключение…";
-            BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+            BasicModeStatusText.Foreground = GetAccentBrush();
             BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ПОДГОТОВКА…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
@@ -249,7 +363,7 @@ public partial class MainWindow : Window
         if (_isZapretStrategyTestRunning || _isZapretServiceActionRunning)
         {
             BasicModeStatusText.Text = _isZapretStrategyTestRunning ? "Проверяю стратегии zapret…" : "Выполняется операция zapret…";
-            BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+            BasicModeStatusText.Foreground = GetAccentBrush();
             BasicConnectionButtonText.Text = _isZapretStrategyTestRunning ? "ПРОВЕРКА…" : "ОПЕРАЦИЯ…";
             BasicConnectionButton.IsEnabled = false;
             BasicDnsToggle.IsEnabled = false;
@@ -460,6 +574,8 @@ public partial class MainWindow : Window
 
     private void SaveSettings()
     {
+        if (_isScreenshotPreview) return;
+
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
@@ -844,6 +960,9 @@ public partial class MainWindow : Window
         ZapretStatusText.Visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    private System.Windows.Media.Brush GetAccentBrush() =>
+        (System.Windows.Media.Brush)FindResource("AccentBrush");
+
     private void ProviderComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (Ipv4TextBox is null || ProviderComboBox.SelectedItem is not DnsProvider provider) return;
@@ -855,8 +974,11 @@ public partial class MainWindow : Window
         }
         DnsAddressSettingsPanel.Visibility = provider.RequiresManualAddressInput ? Visibility.Visible : Visibility.Collapsed;
         DnsDohSettingsPanel.Visibility = provider.RequiresManualAddressInput ? Visibility.Visible : Visibility.Collapsed;
-        _settings.DnsProviderName = provider.Name;
-        SaveSettings();
+        if (!_isScreenshotPreview)
+        {
+            _settings.DnsProviderName = provider.Name;
+            SaveSettings();
+        }
         var ipv4 = SplitAddressPair(provider.Ipv4);
         var ipv6 = SplitAddressPair(provider.Ipv6);
         Ipv4TextBox.Text = ipv4.Primary;
@@ -869,6 +991,7 @@ public partial class MainWindow : Window
 
     private void BasicDnsProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isScreenshotPreview) return;
         if (_isSyncingBasicSelectors || BasicDnsProviderComboBox.SelectedItem is not DnsProvider provider) return;
         _isSyncingBasicSelectors = true;
         ProviderComboBox.SelectedItem = provider;
@@ -878,6 +1001,7 @@ public partial class MainWindow : Window
 
     private void BasicStrategyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isScreenshotPreview) return;
         if (_isSyncingBasicSelectors || BasicStrategyComboBox.SelectedItem is not BasicStrategyChoice choice) return;
         _settings.BasicZapretAutoStrategy = choice.IsAutomatic;
         _settings.BasicZapretStrategyPath = choice.Path;
@@ -1712,7 +1836,7 @@ public partial class MainWindow : Window
         {
             ZapretHealthStatusText.Text = "Служба меняет состояние. Повторите проверку через несколько секунд.";
             ZapretTestPhaseText.Text = "Служба запускается или останавливается";
-            ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+            ZapretTestPhaseText.Foreground = GetAccentBrush();
             return;
         }
 
@@ -1758,11 +1882,11 @@ public partial class MainWindow : Window
         ZapretHealthStatusText.Text = $"Проверяю цели из targets.txt через {displayStrategyName}…";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Проверка выполняется";
-        ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+        ZapretTestPhaseText.Foreground = GetAccentBrush();
         ZapretTestStrategyText.Text = $"Активная служба: {displayStrategyName}. Тестирую HTTP/1.1, TLS 1.2, TLS 1.3 и ping; службу не прерываю.";
         ZapretTestProgressBar.IsIndeterminate = true;
         ZapretTestProgressBar.Visibility = Visibility.Visible;
-        ResetZapretTargetStatuses("Проверяется…", System.Windows.Media.Brushes.DodgerBlue);
+        ResetZapretTargetStatuses("Проверяется…", GetAccentBrush());
         try
         {
             ZapretConnectivityTester.EnsureCurlAvailable();
@@ -1847,7 +1971,7 @@ public partial class MainWindow : Window
         ZapretHealthStatusText.Text = "Подготовка проверки…";
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Подготовка";
-        ZapretTestPhaseText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+        ZapretTestPhaseText.Foreground = GetAccentBrush();
         ZapretTestStrategyText.Text = startAfterCheck
             ? _isZapretRankedCandidateCheck
                 ? $"Лидер сохранённого рейтинга проверяется; затем запускается {(useService ? "как служба Windows" : "в фоне без службы")} ."
@@ -1947,7 +2071,7 @@ public partial class MainWindow : Window
         };
         ZapretTestPhaseText.Foreground = progress.Phase switch
         {
-            "checking" or "starting" or "scored" => System.Windows.Media.Brushes.DodgerBlue,
+            "checking" or "starting" or "scored" => GetAccentBrush(),
             "failed" => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
@@ -1959,7 +2083,7 @@ public partial class MainWindow : Window
             : progress.Message;
         ZapretHealthStatusText.Foreground = progress.Phase switch
         {
-            "checking" or "starting" or "scored" => System.Windows.Media.Brushes.DodgerBlue,
+            "checking" or "starting" or "scored" => GetAccentBrush(),
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
             "completed" => System.Windows.Media.Brushes.Goldenrod,
@@ -1981,7 +2105,7 @@ public partial class MainWindow : Window
             BasicModeStatusText.Text = progress.TotalProbeCount > 0
                 ? $"Проверка zapret: {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
                 : "Подготовка проверки zapret…";
-            BasicModeStatusText.Foreground = System.Windows.Media.Brushes.DodgerBlue;
+            BasicModeStatusText.Foreground = GetAccentBrush();
             BasicConnectionButtonText.Text = "ПРОВЕРКА…";
         }
 
@@ -2054,7 +2178,7 @@ public partial class MainWindow : Window
             if (!groups.TryGetValue(target, out var summary) || summary.HttpTotal + summary.PingTotal == 0)
             {
                 SetZapretTargetStatus(target, pendingStatus, pendingStatus == "Проверяется…"
-                    ? System.Windows.Media.Brushes.DodgerBlue
+                    ? GetAccentBrush()
                     : System.Windows.Media.Brushes.Gray);
                 continue;
             }

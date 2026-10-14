@@ -65,7 +65,7 @@ public partial class ThemedMessageDialogWindow : Window
             {
                 button.Background = TryFindResource("AccentBrush") as Brush;
                 button.BorderBrush = TryFindResource("AccentBrush") as Brush;
-                button.Foreground = new SolidColorBrush(Color.FromRgb(7, 21, 26));
+                button.Foreground = new SolidColorBrush(Color.FromRgb(8, 37, 42));
             }
 
             button.Click += (_, _) =>
@@ -90,8 +90,8 @@ public partial class ThemedMessageDialogWindow : Window
             : image == MessageBoxImage.Warning
                 ? ("!", Color.FromRgb(255, 190, 85))
                 : image == MessageBoxImage.Question
-                    ? ("?", Color.FromRgb(19, 188, 232))
-                    : ("i", Color.FromRgb(19, 188, 232));
+                    ? ("?", Color.FromRgb(8, 184, 209))
+                    : ("i", Color.FromRgb(8, 184, 209));
         IconGlyph.Text = symbol;
         IconGlyph.Foreground = new SolidColorBrush(color);
         IconContainer.Background = new SolidColorBrush(Color.FromArgb(34, color.R, color.G, color.B));
