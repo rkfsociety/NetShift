@@ -141,17 +141,33 @@ internal static class ZapretConnectivityTester
             results);
     }
 
-    internal static int CompareScores(ZapretConnectivitySummary left, ZapretConnectivitySummary right)
+    internal static int CompareScores(
+        ZapretConnectivitySummary left,
+        ZapretConnectivitySummary right,
+        double? leftYouTubeMbps = null,
+        double? rightYouTubeMbps = null)
     {
+        if (leftYouTubeMbps.HasValue || rightYouTubeMbps.HasValue)
+        {
+            var measuredComparison = leftYouTubeMbps.HasValue.CompareTo(rightYouTubeMbps.HasValue);
+            if (measuredComparison != 0) return measuredComparison;
+
+            var speedComparison = Nullable.Compare(leftYouTubeMbps, rightYouTubeMbps);
+            if (speedComparison != 0) return speedComparison;
+        }
+
         var httpComparison = left.HttpPassed.CompareTo(right.HttpPassed);
         return httpComparison != 0 ? httpComparison : left.PingPassed.CompareTo(right.PingPassed);
     }
 
-    internal static bool ShouldRetryFullSweep(ZapretConnectivitySummary? summary) =>
+    internal static bool ShouldRetryFullSweep(
+        ZapretConnectivitySummary? summary,
+        YouTubeSpeedTestMeasurement? youtubeSpeed = null) =>
         summary is null ||
         summary.HttpTotal + summary.PingTotal == 0 ||
         summary.HttpPassed != summary.HttpTotal ||
-        summary.PingPassed != summary.PingTotal;
+        summary.PingPassed != summary.PingTotal ||
+        youtubeSpeed?.Mbps is double mbps && mbps < YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps;
 
     private static ZapretConnectivityTarget? ParseTarget(string name, string value)
     {

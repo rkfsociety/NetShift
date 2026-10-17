@@ -53,6 +53,9 @@ public partial class MainWindow : Window
     private bool _isSyncingBasicSelectors;
     private string? _lastZapretTestProgressJson;
     private readonly List<ZapretStrategyRanking> _currentZapretStrategyRankings = [];
+    private readonly HashSet<string> _youtubeSpeedReplyIds = new(StringComparer.OrdinalIgnoreCase);
+    private YouTubeSpeedTestWindow? _youtubeSpeedTestWindow;
+    private string? _youtubeSpeedTestUnavailableError;
     private bool _isZapretRankedCandidateCheck;
     private string? _rankedCandidatePath;
     private readonly bool _isScreenshotPreview;
@@ -78,7 +81,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.084";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.085";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -197,7 +200,7 @@ public partial class MainWindow : Window
 
         var sampleFolder = @"C:\NetShift\zapret-1.8.2";
         var sampleStrategyPath = Path.Combine(sampleFolder, "general (ALT).bat");
-        var sampleStrategy = new StrategyItem("general (ALT)", sampleStrategyPath, ZapretStrategyHealthStatus.Green, true);
+        var sampleStrategy = new StrategyItem("general (ALT)", sampleStrategyPath, ZapretStrategyHealthStatus.Green, true, null);
         ZapretFolderTextBox.Text = sampleFolder;
         StrategyComboBox.ItemsSource = new[] { sampleStrategy };
         StrategyComboBox.SelectedValuePath = nameof(StrategyItem.Path);
@@ -848,6 +851,10 @@ public partial class MainWindow : Window
             .Where(entry => !string.IsNullOrWhiteSpace(entry.ranking.Path))
             .GroupBy(entry => entry.ranking.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Min(entry => entry.index), StringComparer.OrdinalIgnoreCase);
+        var youtubeSpeedByPath = _settings.ZapretStrategyRankings
+            .Where(ranking => !string.IsNullOrWhiteSpace(ranking.Path))
+            .GroupBy(ranking => ranking.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().YouTubeSpeedMbps, StringComparer.OrdinalIgnoreCase);
         var items = strategies.Select(path =>
         {
             var fullPath = Path.GetFullPath(path);
@@ -856,7 +863,8 @@ public partial class MainWindow : Window
             _settings.ZapretStrategyStatuses.TryGetValue(healthKey, out var savedStatus);
             var healthStatus = ZapretStrategyHealthRules.FromStoredStatus(savedStatus, legacyHealthy);
             var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
-            return new StrategyItem(Path.GetFileName(path), fullPath, healthStatus, isRecommended);
+            youtubeSpeedByPath.TryGetValue(fullPath, out var youtubeSpeedMbps);
+            return new StrategyItem(Path.GetFileName(path), fullPath, healthStatus, isRecommended, youtubeSpeedMbps);
         })
             .OrderBy(item => rankingOrder.TryGetValue(item.Path, out var rank) ? rank : int.MaxValue)
             .ThenBy(item => item.Path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))
@@ -2101,15 +2109,18 @@ public partial class MainWindow : Window
         ZapretHealthStatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         ZapretTestPhaseText.Text = "Проверка выполняется";
         ZapretTestPhaseText.Foreground = GetAccentBrush();
-        ZapretTestStrategyText.Text = $"Активная служба: {displayStrategyName}. Тестирую HTTP/1.1, TLS 1.2, TLS 1.3 и ping; службу не прерываю.";
+        ZapretTestStrategyText.Text = $"Активная служба: {displayStrategyName}. Проверяю HTTP/TLS, ping и скорость YouTube; видео воспроизводится без звука, службу не прерываю.";
         ZapretTestProgressBar.IsIndeterminate = true;
         ZapretTestProgressBar.Visibility = Visibility.Visible;
         ResetZapretTargetStatuses("Проверяется…", GetAccentBrush());
+        YouTubeTestStatusText.Text = "Проверяю без звука…";
+        YouTubeTestStatusText.Foreground = GetAccentBrush();
         try
         {
             ZapretConnectivityTester.EnsureCurlAvailable();
             var targets = ZapretConnectivityTester.LoadTargets(Path.GetDirectoryName(activeStrategyPath)!);
             var result = await ZapretConnectivityTester.CheckTargetsAsync(targets);
+            var youtubeSpeed = await MeasureYouTubeSpeedAsync(displayStrategyName);
             var healthStatus = ZapretStrategyHealthRules.FromResults(result.HttpPassed, result.HttpTotal, result.PingPassed, result.PingTotal);
             var healthy = healthStatus == ZapretStrategyHealthStatus.Green;
             SetZapretTargetStatuses(result.Groups);
@@ -2121,7 +2132,11 @@ public partial class MainWindow : Window
             SaveSettings();
             UpdateZapretInventory();
 
-            ZapretHealthStatusText.Text = $"{displayStrategyName}: HTTP/TLS {result.HttpPassed}/{result.HttpTotal}; ping {result.PingPassed}/{result.PingTotal}.";
+            var youtubeSpeedText = youtubeSpeed.Mbps is double mbps
+                ? $"YouTube {mbps:F2} Мбит/с"
+                : $"YouTube: {youtubeSpeed.Error}";
+            ZapretHealthStatusText.Text = $"{displayStrategyName}: {youtubeSpeedText}; HTTP/TLS {result.HttpPassed}/{result.HttpTotal}; ping {result.PingPassed}/{result.PingTotal}.";
+            SetYouTubeSpeedStatus(youtubeSpeed);
             var hasAnySuccess = result.HttpPassed + result.PingPassed > 0;
             ZapretHealthStatusText.Foreground = healthy ? System.Windows.Media.Brushes.LightGreen
                 : hasAnySuccess ? System.Windows.Media.Brushes.Goldenrod
@@ -2144,6 +2159,7 @@ public partial class MainWindow : Window
             ZapretTestProgressBar.IsIndeterminate = false;
             ZapretTestProgressBar.Visibility = Visibility.Collapsed;
             CheckActiveStrategyButton.IsEnabled = !_isZapretStrategyTestRunning && Directory.Exists(ZapretFolderTextBox.Text.Trim());
+            CloseYouTubeSpeedTestWindow();
         }
     }
 
@@ -2261,6 +2277,18 @@ public partial class MainWindow : Window
             UpdateZapretInventory();
             try { File.Delete(progressPath); } catch { }
             try { File.Delete(progressPath + ".tmp"); } catch { }
+            foreach (var requestId in _youtubeSpeedReplyIds)
+            {
+                try
+                {
+                    var responsePath = AdminCommandRouter.RequireYouTubeSpeedReplyPath(progressPath, requestId);
+                    File.Delete(responsePath);
+                    File.Delete(responsePath + ".tmp");
+                }
+                catch { }
+            }
+            _youtubeSpeedReplyIds.Clear();
+            CloseYouTubeSpeedTestWindow();
         }
     }
 
@@ -2278,10 +2306,20 @@ public partial class MainWindow : Window
         catch (JsonException) { return; }
         if (progress is null) return;
 
+        if (progress.Phase == "youtube-speed-check" &&
+            progress.YouTubeSpeedRequestId is { } requestId &&
+            Guid.TryParseExact(requestId, "N", out _) &&
+            _youtubeSpeedReplyIds.Add(requestId))
+        {
+            await WriteYouTubeSpeedReplyAsync(progressPath, requestId, progress.StrategyPath);
+        }
+
         ZapretTestPhaseText.Text = progress.Phase switch
         {
             "starting" => "Запуск стратегии",
             "checking" => "Проверка",
+            "youtube-speed-check" => "YouTube без звука",
+            "youtube-speed-scored" => "Скорость получена",
             "failed" => "Не прошла",
             "scored" => "Результат получен",
             "completed" => progress.RecommendedPath is null ? "Подходящая не найдена" : "Проверка завершена",
@@ -2289,20 +2327,40 @@ public partial class MainWindow : Window
         };
         ZapretTestPhaseText.Foreground = progress.Phase switch
         {
-            "checking" or "starting" or "scored" => GetAccentBrush(),
+            "checking" or "starting" or "scored" or "youtube-speed-check" => GetAccentBrush(),
+            "youtube-speed-scored" when progress.YouTubeSpeedMbps is > YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps => System.Windows.Media.Brushes.LightGreen,
+            "youtube-speed-scored" => System.Windows.Media.Brushes.Goldenrod,
             "failed" => System.Windows.Media.Brushes.IndianRed,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
+            "completed" when progress.YouTubeSpeedMbps is double lowSpeedMbps && lowSpeedMbps < YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps => System.Windows.Media.Brushes.Goldenrod,
+            "completed" when progress.YouTubeSpeedMbps is null && !string.IsNullOrWhiteSpace(progress.YouTubeSpeedError) => System.Windows.Media.Brushes.Goldenrod,
+            "completed" when progress.YouTubeSpeedMbps is double goodSpeedMbps && goodSpeedMbps >= YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps &&
+                progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
+            "completed" when progress.YouTubeSpeedMbps.HasValue => System.Windows.Media.Brushes.Goldenrod,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
             "completed" => System.Windows.Media.Brushes.Goldenrod,
             _ => (System.Windows.Media.Brush)FindResource("MutedBrush")
         };
-        ZapretHealthStatusText.Text = progress.TotalProbeCount > 0 && (progress.Phase is "checking" or "scored")
+        ZapretHealthStatusText.Text = progress.Phase == "youtube-speed-check"
+            ? $"Измеряю реальную загрузку видеопотока YouTube без звука: {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
+            : progress.Phase == "youtube-speed-scored"
+                ? progress.YouTubeSpeedMbps is double youtubeMbps
+                    ? $"YouTube: {youtubeMbps:F2} Мбит/с для {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
+                    : $"Скорость YouTube не измерена: {progress.YouTubeSpeedError}"
+                : progress.TotalProbeCount > 0 && (progress.Phase is "checking" or "scored")
             ? $"Проверяю {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
             : progress.Message;
         ZapretHealthStatusText.Foreground = progress.Phase switch
         {
-            "checking" or "starting" or "scored" => GetAccentBrush(),
+            "checking" or "starting" or "scored" or "youtube-speed-check" => GetAccentBrush(),
+            "youtube-speed-scored" when progress.YouTubeSpeedMbps is > YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps => System.Windows.Media.Brushes.LightGreen,
+            "youtube-speed-scored" => System.Windows.Media.Brushes.Goldenrod,
             "completed" when progress.RecommendedPath is null => System.Windows.Media.Brushes.IndianRed,
+            "completed" when progress.YouTubeSpeedMbps is double lowCompletedMbps && lowCompletedMbps < YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps => System.Windows.Media.Brushes.Goldenrod,
+            "completed" when progress.YouTubeSpeedMbps is null && !string.IsNullOrWhiteSpace(progress.YouTubeSpeedError) => System.Windows.Media.Brushes.Goldenrod,
+            "completed" when progress.YouTubeSpeedMbps is double goodCompletedMbps && goodCompletedMbps >= YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps &&
+                progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
+            "completed" when progress.YouTubeSpeedMbps.HasValue => System.Windows.Media.Brushes.Goldenrod,
             "completed" when progress.HttpTotal > 0 && progress.HttpPassed == progress.HttpTotal && progress.PingPassed == progress.PingTotal => System.Windows.Media.Brushes.LightGreen,
             "completed" => System.Windows.Media.Brushes.Goldenrod,
             "failed" when progress.Completed => System.Windows.Media.Brushes.IndianRed,
@@ -2329,6 +2387,16 @@ public partial class MainWindow : Window
 
         var pendingStatus = progress.Phase == "checking" ? "Проверяется…" : progress.Phase == "failed" ? "Не проверено" : "Ожидает";
         SetZapretTargetStatuses(progress.Groups, pendingStatus);
+        if (progress.Phase == "youtube-speed-check")
+        {
+            YouTubeTestStatusText.Text = "Загружаю тестовый ролик без звука…";
+            YouTubeTestStatusText.Foreground = GetAccentBrush();
+            YouTubeTestIndicator.Fill = GetAccentBrush();
+        }
+        else if (progress.Phase == "youtube-speed-scored")
+        {
+            SetYouTubeSpeedStatus(new YouTubeSpeedTestMeasurement(progress.YouTubeSpeedMbps, 0, 0, progress.YouTubeSpeedError));
+        }
 
         var healthChanged = false;
         if (progress.StrategyPath is not null && (progress.Phase is "failed" or "scored"))
@@ -2342,7 +2410,7 @@ public partial class MainWindow : Window
             {
                 _currentZapretStrategyRankings.Add(new ZapretStrategyRanking(
                     Path.GetFullPath(progress.StrategyPath), progress.HttpPassed, progress.HttpTotal,
-                    progress.PingPassed, progress.PingTotal));
+                    progress.PingPassed, progress.PingTotal, progress.YouTubeSpeedMbps));
             }
         }
         if (progress.Completed && progress.StrategyResults is { } strategyResults)
@@ -2356,7 +2424,7 @@ public partial class MainWindow : Window
                         ZapretStrategyHealthRules.FromResults(result.HttpPassed, result.HttpTotal, result.PingPassed, result.PingTotal));
                     _currentZapretStrategyRankings.Add(new ZapretStrategyRanking(
                         Path.GetFullPath(result.StrategyPath), result.HttpPassed, result.HttpTotal,
-                        result.PingPassed, result.PingTotal));
+                        result.PingPassed, result.PingTotal, result.YouTubeSpeedMbps));
                 }
                 else
                 {
@@ -2391,6 +2459,63 @@ public partial class MainWindow : Window
             SaveSettings();
             RefreshStrategyItems();
         }
+    }
+
+    private async Task WriteYouTubeSpeedReplyAsync(string progressPath, string requestId, string? strategyPath)
+    {
+        var responsePath = AdminCommandRouter.RequireYouTubeSpeedReplyPath(progressPath, requestId);
+        YouTubeSpeedTestMeasurement measurement;
+        try
+        {
+            var strategyName = string.IsNullOrWhiteSpace(strategyPath)
+                ? "активная стратегия"
+                : Path.GetFileNameWithoutExtension(strategyPath);
+            measurement = await MeasureYouTubeSpeedAsync(strategyName);
+        }
+        catch (Exception error)
+        {
+            measurement = YouTubeSpeedTestMeasurement.Failed($"Не удалось выполнить проверку YouTube: {error.Message}");
+        }
+
+        var temporaryPath = responsePath + ".tmp";
+        var reply = new YouTubeSpeedTestReply(requestId, measurement);
+        await File.WriteAllTextAsync(temporaryPath, JsonSerializer.Serialize(reply), new UTF8Encoding(false));
+        File.Move(temporaryPath, responsePath, overwrite: true);
+    }
+
+    private async Task<YouTubeSpeedTestMeasurement> MeasureYouTubeSpeedAsync(string strategyName)
+    {
+        if (_youtubeSpeedTestUnavailableError is not null)
+            return YouTubeSpeedTestMeasurement.Unsupported(_youtubeSpeedTestUnavailableError);
+
+        if (_youtubeSpeedTestWindow is null || !_youtubeSpeedTestWindow.IsLoaded)
+        {
+            var window = new YouTubeSpeedTestWindow { Owner = this, ShowActivated = false };
+            _youtubeSpeedTestWindow = window;
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_youtubeSpeedTestWindow, window)) _youtubeSpeedTestWindow = null;
+            };
+            window.Show();
+        }
+
+        var activeWindow = _youtubeSpeedTestWindow;
+        var measurement = await activeWindow.MeasureAsync(strategyName);
+        if (activeWindow.RuntimeUnavailable)
+        {
+            _youtubeSpeedTestUnavailableError = measurement.Error;
+            if (ReferenceEquals(_youtubeSpeedTestWindow, activeWindow)) CloseYouTubeSpeedTestWindow();
+        }
+        return measurement;
+    }
+
+    private void CloseYouTubeSpeedTestWindow()
+    {
+        var window = _youtubeSpeedTestWindow;
+        _youtubeSpeedTestWindow = null;
+        if (window is null) return;
+        try { window.Close(); }
+        catch (InvalidOperationException) { }
     }
 
     private static async Task<ZapretTestProgress?> ReadZapretTestProgressAsync(string progressPath)
@@ -2831,9 +2956,15 @@ public partial class MainWindow : Window
     {
         public override string ToString() => Name;
     }
-    private sealed record StrategyItem(string Name, string Path, ZapretStrategyHealthStatus HealthStatus, bool IsRecommended)
+    private sealed record StrategyItem(
+        string Name,
+        string Path,
+        ZapretStrategyHealthStatus HealthStatus,
+        bool IsRecommended,
+        double? YouTubeSpeedMbps)
     {
         public Visibility HealthVisibility => HealthStatus == ZapretStrategyHealthStatus.Unknown ? Visibility.Collapsed : Visibility.Visible;
+        public string YouTubeSpeedLabel => YouTubeSpeedMbps is double mbps ? $"YouTube {mbps:F2} Мбит/с" : string.Empty;
         public System.Windows.Media.Brush HealthBrush => HealthStatus switch
         {
             ZapretStrategyHealthStatus.Green => System.Windows.Media.Brushes.LightGreen,
@@ -2847,7 +2978,12 @@ public partial class MainWindow : Window
             ZapretStrategyHealthStatus.Yellow => "Часть проверок прошла",
             ZapretStrategyHealthStatus.Red => "Ни одна проверка не прошла",
             _ => "Стратегия ещё не проверялась"
-        } + (IsRecommended ? ". Лучшая по числу успешных проверок" : string.Empty);
+        } + (YouTubeSpeedMbps is double mbps ? $"; скорость YouTube {mbps:F2} Мбит/с" : string.Empty) +
+            (IsRecommended
+                ? YouTubeSpeedMbps.HasValue
+                    ? ". Лучшая по измеренной скорости YouTube среди проверенных"
+                    : ". Лучшая по HTTP/TLS и ping среди проверенных"
+                : string.Empty);
         public override string ToString() => Name;
     }
 }

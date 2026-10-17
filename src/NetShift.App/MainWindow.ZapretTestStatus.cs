@@ -20,4 +20,20 @@ public partial class MainWindow
         statusText.Text = status;
         statusText.Foreground = color;
     }
+
+    private void SetYouTubeSpeedStatus(Models.YouTubeSpeedTestMeasurement measurement)
+    {
+        var color = measurement.Mbps switch
+        {
+            double mbps when mbps >= Models.YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps => System.Windows.Media.Brushes.LightGreen,
+            > 0 => System.Windows.Media.Brushes.Goldenrod,
+            0 => System.Windows.Media.Brushes.IndianRed,
+            _ => System.Windows.Media.Brushes.Goldenrod
+        };
+        YouTubeTestIndicator.Fill = color;
+        YouTubeTestStatusText.Text = measurement.Mbps is double displayedMbps
+            ? $"{displayedMbps:F2} Мбит/с · без звука"
+            : measurement.Error ?? "Скорость не измерена";
+        YouTubeTestStatusText.Foreground = color;
+    }
 }

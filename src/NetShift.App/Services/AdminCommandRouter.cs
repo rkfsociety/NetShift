@@ -764,10 +764,10 @@ public static class AdminCommandRouter
         EnsureZapretCanBeTested();
         var targets = ZapretConnectivityTester.LoadTargets(folder);
         var completedProbeCount = 0;
-        var totalProbeCount = ZapretConnectivityTester.CountProbeOperations(targets) * strategies.Length;
+        var totalProbeCount = (ZapretConnectivityTester.CountProbeOperations(targets) + 1) * strategies.Length;
         var progressWriteLock = new object();
         var testedCount = 0;
-        var candidates = new List<(string Path, ZapretConnectivitySummary Summary)>();
+        var candidates = new List<(string Path, ZapretConnectivitySummary Summary, YouTubeSpeedTestMeasurement YouTubeSpeed)>();
         var failures = new List<string>();
         var strategyResults = new List<ZapretTestStrategyResult>();
         var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, [], 0, 0, 0, 0,
@@ -782,6 +782,7 @@ public static class AdminCommandRouter
             var strategyName = Path.GetFileNameWithoutExtension(strategyPath);
             Process? batchProcess = null;
             ZapretConnectivitySummary? summary = null;
+            YouTubeSpeedTestMeasurement? youtubeSpeed = null;
             string? failure = null;
             progress = new ZapretTestProgress(strategyPath, "starting", testedCount + 1, strategies.Length, [], 0, 0, 0, 0,
                 $"Запускаю временно {strategyName}.",
@@ -803,6 +804,23 @@ public static class AdminCommandRouter
                         WriteZapretTestProgress(progressPath, progress);
                     }
                 }).GetAwaiter().GetResult();
+                youtubeSpeed = RequestYouTubeSpeedTest(progressPath, progress);
+                lock (progressWriteLock)
+                {
+                    completedProbeCount++;
+                    progress = progress with
+                    {
+                        Phase = "youtube-speed-scored",
+                        YouTubeSpeedRequestId = null,
+                        YouTubeSpeedMbps = youtubeSpeed.Mbps,
+                        YouTubeSpeedError = youtubeSpeed.Error,
+                        CompletedProbeCount = completedProbeCount,
+                        Message = youtubeSpeed.Mbps is double mbps
+                            ? $"YouTube: {mbps:F2} Мбит/с."
+                            : $"Скорость YouTube не измерена. {youtubeSpeed.Error}"
+                    };
+                    WriteZapretTestProgress(progressPath, progress);
+                }
             }
             catch (Exception error)
             {
@@ -819,21 +837,23 @@ public static class AdminCommandRouter
                 batchProcess?.Dispose();
             }
 
-            if (candidateOnly && ZapretConnectivityTester.ShouldRetryFullSweep(summary))
+            if (candidateOnly && ZapretConnectivityTester.ShouldRetryFullSweep(summary, youtubeSpeed))
                 return RunZapretStrategyTestSweep(folder, progressPath);
 
             testedCount++;
             if (summary is not null)
             {
-                candidates.Add((Path.GetFullPath(strategyPath), summary));
+                candidates.Add((Path.GetFullPath(strategyPath), summary, youtubeSpeed ?? YouTubeSpeedTestMeasurement.Failed("Скорость YouTube не измерена.")));
                 strategyResults.Add(new ZapretTestStrategyResult(
                     Path.GetFullPath(strategyPath), "scored", summary.HttpPassed, summary.HttpTotal,
-                    summary.PingPassed, summary.PingTotal));
+                    summary.PingPassed, summary.PingTotal, youtubeSpeed?.Mbps, youtubeSpeed?.Error));
                 progress = new ZapretTestProgress(strategyPath, "scored", testedCount, strategies.Length,
                     summary.Groups, summary.HttpPassed, summary.HttpTotal, summary.PingPassed, summary.PingTotal,
-                    $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
+                    $"{strategyName}: YouTube {youtubeSpeed?.Mbps?.ToString("F2") ?? "—"} Мбит/с; HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
                     CompletedProbeCount: completedProbeCount,
-                    TotalProbeCount: totalProbeCount);
+                    TotalProbeCount: totalProbeCount,
+                    YouTubeSpeedMbps: youtubeSpeed?.Mbps,
+                    YouTubeSpeedError: youtubeSpeed?.Error);
             }
             else
             {
@@ -850,26 +870,72 @@ public static class AdminCommandRouter
 
         var bestCandidate = candidates.FirstOrDefault();
         foreach (var candidate in candidates.Skip(1))
-            if (ZapretConnectivityTester.CompareScores(candidate.Summary, bestCandidate.Summary) > 0)
+            if (ZapretConnectivityTester.CompareScores(candidate.Summary, bestCandidate.Summary,
+                    candidate.YouTubeSpeed.Mbps, bestCandidate.YouTubeSpeed.Mbps) > 0)
                 bestCandidate = candidate;
 
         var recommendedPath = candidates.Count == 0 ? null : bestCandidate.Path;
         var bestSummary = candidates.Count == 0 ? null : bestCandidate.Summary;
+        var bestYouTubeSpeed = candidates.Count == 0 ? null : bestCandidate.YouTubeSpeed;
+        var bestStrategyName = candidates.Count == 0 ? null : Path.GetFileNameWithoutExtension(recommendedPath);
         progress = new ZapretTestProgress(null, "completed", testedCount, strategies.Length,
             bestSummary?.Groups ?? [], bestSummary?.HttpPassed ?? 0, bestSummary?.HttpTotal ?? 0,
             bestSummary?.PingPassed ?? 0, bestSummary?.PingTotal ?? 0,
             recommendedPath is null
                 ? $"Не удалось проверить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}. {failures.FirstOrDefault()}"
                 : candidateOnly
-                    ? $"Дополнительная проверка {Path.GetFileNameWithoutExtension(recommendedPath)} завершена: HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}."
-                    : $"Лучшая по результатам оригинальной проверки: {Path.GetFileNameWithoutExtension(recommendedPath)} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}.",
+                    ? $"Дополнительная проверка {bestStrategyName} завершена: YouTube {bestYouTubeSpeed!.Mbps?.ToString("F2") ?? "не измерена"} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. {bestYouTubeSpeed.Error}"
+                    : bestYouTubeSpeed?.Mbps is double bestMbps
+                        ? $"Лучшая скорость YouTube: {bestStrategyName} — {bestMbps:F2} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}."
+                        : $"Скорость YouTube не измерена ({bestYouTubeSpeed?.Error}). Рекомендация по доступности: {bestStrategyName} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}.",
             recommendedPath,
             Completed: true,
             CompletedProbeCount: completedProbeCount,
             TotalProbeCount: totalProbeCount,
-            StrategyResults: strategyResults);
+            StrategyResults: strategyResults,
+            YouTubeSpeedMbps: bestYouTubeSpeed?.Mbps,
+            YouTubeSpeedError: bestYouTubeSpeed?.Error);
         WriteZapretTestProgress(progressPath, progress);
         return recommendedPath;
+    }
+
+    private static YouTubeSpeedTestMeasurement RequestYouTubeSpeedTest(string progressPath, ZapretTestProgress progress)
+    {
+        var requestId = Guid.NewGuid().ToString("N");
+        var responsePath = RequireYouTubeSpeedReplyPath(progressPath, requestId);
+        progress = progress with
+        {
+            Phase = "youtube-speed-check",
+            YouTubeSpeedRequestId = requestId,
+            YouTubeSpeedMbps = null,
+            YouTubeSpeedError = null,
+            Message = $"Измеряю скорость YouTube для {Path.GetFileNameWithoutExtension(progress.StrategyPath)} без звука."
+        };
+        WriteZapretTestProgress(progressPath, progress);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(responsePath))
+            {
+                var reply = JsonSerializer.Deserialize<YouTubeSpeedTestReply>(File.ReadAllText(responsePath));
+                File.Delete(responsePath);
+                if (reply is null || !reply.RequestId.Equals(requestId, StringComparison.OrdinalIgnoreCase))
+                    return YouTubeSpeedTestMeasurement.Failed("Получен некорректный ответ проверки YouTube.");
+                return reply.Measurement;
+            }
+            Thread.Sleep(100);
+        }
+
+        return YouTubeSpeedTestMeasurement.Failed("Основное окно не ответило на запрос проверки скорости YouTube за 45 секунд.");
+    }
+
+    internal static string RequireYouTubeSpeedReplyPath(string progressPath, string requestId)
+    {
+        var validatedProgressPath = RequireZapretTestProgressPath(progressPath);
+        if (!Guid.TryParseExact(requestId, "N", out _))
+            throw new InvalidOperationException("Недопустимый идентификатор проверки скорости YouTube.");
+        return validatedProgressPath + "." + requestId + ".youtube.json";
     }
 
     private static void AutoConnectZapret(string folder, string progressPath, string strategyMode, string requestedStrategyPath, string runtimeMode)

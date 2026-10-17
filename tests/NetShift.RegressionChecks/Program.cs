@@ -10,6 +10,7 @@ CheckZapretTargetParsing();
 CheckZapretStrategyHealth();
 CheckZapretCurlModesAndRanking();
 CheckZapretStrategyRankingPersistence();
+CheckYouTubeSpeedTesting();
 CheckBackupIsIdempotent();
 CheckAdapterLookupWithStringGuid();
 CheckDnsProfileAdapterLookupWithStringGuid();
@@ -118,13 +119,13 @@ static void CheckZapretCurlModesAndRanking()
         StrategyResults:
         [
             new ZapretTestStrategyResult(@"C:\zapret\general (ALT).bat", "scored", 36, 36, 16, 16),
-            new ZapretTestStrategyResult(@"C:\zapret\general (ALT12).bat", "scored", 35, 36, 16, 16),
+            new ZapretTestStrategyResult(@"C:\zapret\general (ALT12).bat", "scored", 35, 36, 16, 16, 4.25),
             new ZapretTestStrategyResult(@"C:\zapret\general (ALT2).bat", "failed", 0, 0, 0, 0)
         ]);
     var restoredProgress = JsonSerializer.Deserialize<ZapretTestProgress>(JsonSerializer.Serialize(completedProgress));
     var restoredResults = restoredProgress?.StrategyResults;
     if (restoredResults is null || restoredResults.Count != 3 || restoredResults[0].HttpPassed != 36 ||
-        restoredResults[1].HttpPassed != 35 || restoredResults[2].Phase != "failed")
+        restoredResults[1].HttpPassed != 35 || restoredResults[1].YouTubeSpeedMbps != 4.25 || restoredResults[2].Phase != "failed")
         throw new InvalidOperationException("The final zapret progress must retain results for every tested strategy.");
 
     var discord = ZapretConnectivityTester.ParseTargets("DiscordMain = \"https://discord.com\"")[0];
@@ -158,6 +159,35 @@ static void CheckZapretStrategyRankingPersistence()
     if (restored is null || restored.Count != ordered.Count ||
         restored[0].HttpPassed != 36 || restored[1].PingPassed != 17)
         throw new InvalidOperationException("Zapret strategy ranking did not survive settings serialization.");
+
+    var speedOrdered = ZapretStrategyRanking.Order(
+    [
+        new ZapretStrategyRanking(@"C:\zapret\general12.bat", 36, 36, 17, 17, 5.4),
+        new ZapretStrategyRanking(@"C:\zapret\general2.bat", 36, 36, 17, 17, 2.1),
+        new ZapretStrategyRanking(@"C:\zapret\general3.bat", 36, 36, 17, 17)
+    ]);
+    if (Path.GetFileName(speedOrdered[0].Path) != "general12.bat" ||
+        Path.GetFileName(speedOrdered[1].Path) != "general2.bat" ||
+        speedOrdered[2].YouTubeSpeedMbps is not null)
+        throw new InvalidOperationException("Saved strategies must prioritize measured YouTube throughput over legacy connectivity scores.");
+}
+
+static void CheckYouTubeSpeedTesting()
+{
+    var fast = YouTubeSpeedTestMeasurement.FromTransfer(1_000_000, 1_000);
+    var empty = YouTubeSpeedTestMeasurement.FromTransfer(0, 1_000);
+    if (fast.Mbps is not 8d || fast.Error is not null || empty.Mbps is not 0d || empty.Error is null)
+        throw new InvalidOperationException("YouTube transfer samples must convert bytes and elapsed time into megabits per second.");
+
+    var fullConnectivity = new ZapretConnectivitySummary(36, 36, 16, 16, [], []);
+    if (ZapretConnectivityTester.CompareScores(fullConnectivity, fullConnectivity, 5, 1) <= 0 ||
+        ZapretConnectivityTester.CompareScores(fullConnectivity, fullConnectivity, 1, 5) >= 0)
+        throw new InvalidOperationException("Strategy selection must prioritize measured YouTube throughput before connectivity ties.");
+
+    if (!ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.FromTransfer(200_000, 1_000)) ||
+        ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.FromTransfer(500_000, 1_000)) ||
+        ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.Unsupported("runtime missing")))
+        throw new InvalidOperationException("A slow YouTube sample must retry the full strategy sweep; unsupported speed measurement must keep legacy fallback behavior.");
 }
 
 static void CheckBackupIsIdempotent()
