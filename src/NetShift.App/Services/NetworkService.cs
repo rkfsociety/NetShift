@@ -15,6 +15,9 @@ public static class NetworkService
         {
             try
             {
+                var status = adapter.OperationalStatus;
+                if (status != OperationalStatus.Up) continue;
+
                 var isVpn = adapter.NetworkInterfaceType is NetworkInterfaceType.Tunnel or NetworkInterfaceType.Ppp ||
                             $"{adapter.Name} {adapter.Description}".Contains("vpn", StringComparison.OrdinalIgnoreCase) ||
                             $"{adapter.Name} {adapter.Description}".Contains("wireguard", StringComparison.OrdinalIgnoreCase) ||
@@ -31,7 +34,7 @@ public static class NetworkService
                 {
                     Name = adapter.Name,
                     Description = adapter.Description,
-                    Status = adapter.OperationalStatus == OperationalStatus.Up ? "Подключён" : "Отключён",
+                    Status = "Подключён",
                     InterfaceIndex = interfaceIndex.Value,
                     IsVpn = isVpn
                 });
