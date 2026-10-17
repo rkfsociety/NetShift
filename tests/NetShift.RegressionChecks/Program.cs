@@ -113,6 +113,20 @@ static void CheckZapretCurlModesAndRanking()
         !ZapretConnectivityTester.ShouldRetryFullSweep(null))
         throw new InvalidOperationException("A partially passing saved strategy must trigger a full zapret sweep; ALT12's complete result must outrank ALT9's partial result.");
 
+    var completedProgress = new ZapretTestProgress(null, "completed", 22, 22, [], 36, 36, 16, 16, "done",
+        Completed: true,
+        StrategyResults:
+        [
+            new ZapretTestStrategyResult(@"C:\zapret\general (ALT).bat", "scored", 36, 36, 16, 16),
+            new ZapretTestStrategyResult(@"C:\zapret\general (ALT12).bat", "scored", 35, 36, 16, 16),
+            new ZapretTestStrategyResult(@"C:\zapret\general (ALT2).bat", "failed", 0, 0, 0, 0)
+        ]);
+    var restoredProgress = JsonSerializer.Deserialize<ZapretTestProgress>(JsonSerializer.Serialize(completedProgress));
+    var restoredResults = restoredProgress?.StrategyResults;
+    if (restoredResults is null || restoredResults.Count != 3 || restoredResults[0].HttpPassed != 36 ||
+        restoredResults[1].HttpPassed != 35 || restoredResults[2].Phase != "failed")
+        throw new InvalidOperationException("The final zapret progress must retain results for every tested strategy.");
+
     var discord = ZapretConnectivityTester.ParseTargets("DiscordMain = \"https://discord.com\"")[0];
     var targetResult = new ZapretConnectivityTargetResult(discord,
     [

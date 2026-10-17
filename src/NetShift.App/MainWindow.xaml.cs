@@ -78,7 +78,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.083";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.084";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -2344,6 +2344,26 @@ public partial class MainWindow : Window
                     Path.GetFullPath(progress.StrategyPath), progress.HttpPassed, progress.HttpTotal,
                     progress.PingPassed, progress.PingTotal));
             }
+        }
+        if (progress.Completed && progress.StrategyResults is { } strategyResults)
+        {
+            _currentZapretStrategyRankings.Clear();
+            foreach (var result in strategyResults)
+            {
+                if (result.Phase.Equals("scored", StringComparison.OrdinalIgnoreCase))
+                {
+                    SaveStrategyHealth(result.StrategyPath,
+                        ZapretStrategyHealthRules.FromResults(result.HttpPassed, result.HttpTotal, result.PingPassed, result.PingTotal));
+                    _currentZapretStrategyRankings.Add(new ZapretStrategyRanking(
+                        Path.GetFullPath(result.StrategyPath), result.HttpPassed, result.HttpTotal,
+                        result.PingPassed, result.PingTotal));
+                }
+                else
+                {
+                    SaveStrategyHealth(result.StrategyPath, ZapretStrategyHealthStatus.Red);
+                }
+            }
+            healthChanged |= strategyResults.Count > 0;
         }
         if (_settings.RecommendedZapretStrategyPath != progress.RecommendedPath)
         {

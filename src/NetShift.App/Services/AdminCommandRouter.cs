@@ -769,6 +769,7 @@ public static class AdminCommandRouter
         var testedCount = 0;
         var candidates = new List<(string Path, ZapretConnectivitySummary Summary)>();
         var failures = new List<string>();
+        var strategyResults = new List<ZapretTestStrategyResult>();
         var progress = new ZapretTestProgress(null, "starting", 0, strategies.Length, [], 0, 0, 0, 0,
             "Подготовка проверки.",
             CompletedProbeCount: completedProbeCount,
@@ -825,6 +826,9 @@ public static class AdminCommandRouter
             if (summary is not null)
             {
                 candidates.Add((Path.GetFullPath(strategyPath), summary));
+                strategyResults.Add(new ZapretTestStrategyResult(
+                    Path.GetFullPath(strategyPath), "scored", summary.HttpPassed, summary.HttpTotal,
+                    summary.PingPassed, summary.PingTotal));
                 progress = new ZapretTestProgress(strategyPath, "scored", testedCount, strategies.Length,
                     summary.Groups, summary.HttpPassed, summary.HttpTotal, summary.PingPassed, summary.PingTotal,
                     $"{strategyName}: HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
@@ -835,6 +839,7 @@ public static class AdminCommandRouter
             {
                 var failureMessage = string.IsNullOrWhiteSpace(failure) ? "причина не указана" : failure;
                 failures.Add($"{strategyName}: {failureMessage}");
+                strategyResults.Add(new ZapretTestStrategyResult(Path.GetFullPath(strategyPath), "failed", 0, 0, 0, 0));
                 progress = new ZapretTestProgress(strategyPath, "failed", testedCount, strategies.Length, [], 0, 0, 0, 0,
                     $"Не удалось проверить {strategyName}. {failure}",
                     CompletedProbeCount: completedProbeCount,
@@ -861,7 +866,8 @@ public static class AdminCommandRouter
             recommendedPath,
             Completed: true,
             CompletedProbeCount: completedProbeCount,
-            TotalProbeCount: totalProbeCount);
+            TotalProbeCount: totalProbeCount,
+            StrategyResults: strategyResults);
         WriteZapretTestProgress(progressPath, progress);
         return recommendedPath;
     }
