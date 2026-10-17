@@ -35,21 +35,28 @@ internal sealed record YouTubeSpeedTestMeasurement(
     double? Mbps,
     long Bytes,
     long DurationMilliseconds,
-    string? Error)
+    string? Error,
+    bool IsUnsupported = false)
 {
     internal const double MinimumRecommended720pMbps = 2.5;
 
     internal static YouTubeSpeedTestMeasurement FromTransfer(long bytes, long durationMilliseconds)
     {
         if (bytes <= 0 || durationMilliseconds <= 0)
-            return new YouTubeSpeedTestMeasurement(0, Math.Max(0, bytes), Math.Max(0, durationMilliseconds), "YouTube не передал видеоданные.");
+            return new YouTubeSpeedTestMeasurement(null, Math.Max(0, bytes), Math.Max(0, durationMilliseconds), "YouTube не передал видеоданные.");
 
         var mbps = bytes * 8d / durationMilliseconds / 1000d;
         return new YouTubeSpeedTestMeasurement(mbps, bytes, durationMilliseconds, null);
     }
 
-    internal static YouTubeSpeedTestMeasurement Failed(string error) => new(0, 0, 0, error);
-    internal static YouTubeSpeedTestMeasurement Unsupported(string error) => new(null, 0, 0, error);
+    internal static YouTubeSpeedTestMeasurement Failed(string error) => new(null, 0, 0, error);
+    internal static YouTubeSpeedTestMeasurement Unsupported(string error) => new(null, 0, 0, error, IsUnsupported: true);
+
+    internal static string FormatMbps(double mbps)
+    {
+        if (!double.IsFinite(mbps) || mbps <= 0) return "не измерена";
+        return mbps < 0.005 ? $"<{0.01:F2}" : mbps.ToString("F2");
+    }
 }
 
 internal sealed record YouTubeSpeedTestReply(string RequestId, YouTubeSpeedTestMeasurement Measurement);

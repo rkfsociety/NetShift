@@ -31,8 +31,8 @@ public partial class MainWindow
             _ => System.Windows.Media.Brushes.Goldenrod
         };
         YouTubeTestIndicator.Fill = color;
-        YouTubeTestStatusText.Text = measurement.Mbps is double displayedMbps
-            ? $"{displayedMbps:F2} Мбит/с · без звука"
+        YouTubeTestStatusText.Text = measurement.Mbps is > 0 and double displayedMbps
+            ? $"{Models.YouTubeSpeedTestMeasurement.FormatMbps(displayedMbps)} Мбит/с · без звука"
             : measurement.Error ?? "Скорость не измерена";
         YouTubeTestStatusText.Foreground = color;
     }

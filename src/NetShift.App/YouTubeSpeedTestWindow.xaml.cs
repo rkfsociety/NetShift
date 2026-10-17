@@ -11,10 +11,10 @@ namespace NetShift.App;
 public partial class YouTubeSpeedTestWindow : Window
 {
     private const string VirtualHost = "netshift.youtube.test";
-    private static readonly TimeSpan MaximumMeasurementDuration = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan MaximumMeasurementDuration = TimeSpan.FromSeconds(105);
     private static readonly TimeSpan PlayerReadyTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan MediaStartTimeout = TimeSpan.FromSeconds(12);
-    private static readonly TimeSpan TransferSampleDuration = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan TransferSampleDuration = TimeSpan.FromSeconds(30);
     private static readonly string TestRoot = Path.Combine(Path.GetTempPath(), "NetShift-YouTube-SpeedTest");
     private const string TestPage = """
         <!doctype html>
@@ -93,7 +93,7 @@ public partial class YouTubeSpeedTestWindow : Window
             if (sample is null)
                 return YouTubeSpeedTestMeasurement.Failed(mediaReadError ?? "YouTube-плеер запустился, но видеопоток не начал передаваться.");
 
-            StatusText.Text = $"Измеряю видеопоток · {strategyName} · звук отключён";
+            StatusText.Text = $"Измеряю видеопоток 30 секунд · {strategyName} · звук отключён";
             while (sample.Elapsed < TransferSampleDuration)
             {
                 operationToken.ThrowIfCancellationRequested();
@@ -119,7 +119,7 @@ public partial class YouTubeSpeedTestWindow : Window
         {
             var message = cancellationToken.IsCancellationRequested
                 ? "Проверка скорости YouTube была отменена."
-                : "YouTube не завершил замер за 20 секунд.";
+                : "YouTube не завершил замер за 105 секунд.";
             return YouTubeSpeedTestMeasurement.Failed(message);
         }
         catch (Exception error)

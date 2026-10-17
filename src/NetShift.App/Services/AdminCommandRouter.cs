@@ -815,8 +815,8 @@ public static class AdminCommandRouter
                         YouTubeSpeedMbps = youtubeSpeed.Mbps,
                         YouTubeSpeedError = youtubeSpeed.Error,
                         CompletedProbeCount = completedProbeCount,
-                        Message = youtubeSpeed.Mbps is double mbps
-                            ? $"YouTube: {mbps:F2} Мбит/с."
+                        Message = youtubeSpeed.Mbps is > 0 and double mbps
+                            ? $"YouTube: {YouTubeSpeedTestMeasurement.FormatMbps(mbps)} Мбит/с."
                             : $"Скорость YouTube не измерена. {youtubeSpeed.Error}"
                     };
                     WriteZapretTestProgress(progressPath, progress);
@@ -837,7 +837,9 @@ public static class AdminCommandRouter
                 batchProcess?.Dispose();
             }
 
-            if (candidateOnly && ZapretConnectivityTester.ShouldRetryFullSweep(summary, youtubeSpeed))
+            if (candidateOnly && ZapretConnectivityTester.ShouldRetryFullSweep(
+                    summary,
+                    youtubeSpeed ?? YouTubeSpeedTestMeasurement.Failed("Скорость YouTube не измерена.")))
                 return RunZapretStrategyTestSweep(folder, progressPath);
 
             testedCount++;
@@ -849,7 +851,7 @@ public static class AdminCommandRouter
                     summary.PingPassed, summary.PingTotal, youtubeSpeed?.Mbps, youtubeSpeed?.Error));
                 progress = new ZapretTestProgress(strategyPath, "scored", testedCount, strategies.Length,
                     summary.Groups, summary.HttpPassed, summary.HttpTotal, summary.PingPassed, summary.PingTotal,
-                    $"{strategyName}: YouTube {youtubeSpeed?.Mbps?.ToString("F2") ?? "—"} Мбит/с; HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
+                    $"{strategyName}: YouTube {(youtubeSpeed?.Mbps is > 0 and double speedMbps ? YouTubeSpeedTestMeasurement.FormatMbps(speedMbps) : "не измерена")}; HTTP/TLS {summary.HttpPassed}/{summary.HttpTotal}; ping {summary.PingPassed}/{summary.PingTotal}.",
                     CompletedProbeCount: completedProbeCount,
                     TotalProbeCount: totalProbeCount,
                     YouTubeSpeedMbps: youtubeSpeed?.Mbps,
@@ -884,9 +886,9 @@ public static class AdminCommandRouter
             recommendedPath is null
                 ? $"Не удалось проверить ни одну стратегию. Проверено: {testedCount} из {strategies.Length}. {failures.FirstOrDefault()}"
                 : candidateOnly
-                    ? $"Дополнительная проверка {bestStrategyName} завершена: YouTube {bestYouTubeSpeed!.Mbps?.ToString("F2") ?? "не измерена"} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. {bestYouTubeSpeed.Error}"
-                    : bestYouTubeSpeed?.Mbps is double bestMbps
-                        ? $"Лучшая скорость YouTube: {bestStrategyName} — {bestMbps:F2} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}."
+                    ? $"Дополнительная проверка {bestStrategyName} завершена: YouTube {(bestYouTubeSpeed!.Mbps is > 0 and double candidateMbps ? YouTubeSpeedTestMeasurement.FormatMbps(candidateMbps) : "не измерена")} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. {bestYouTubeSpeed.Error}"
+                    : bestYouTubeSpeed?.Mbps is > 0 and double bestMbps
+                        ? $"Лучшая скорость YouTube: {bestStrategyName} — {YouTubeSpeedTestMeasurement.FormatMbps(bestMbps)} Мбит/с; HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}. Ошибок запуска: {failures.Count}."
                         : $"Скорость YouTube не измерена ({bestYouTubeSpeed?.Error}). Рекомендация по доступности: {bestStrategyName} — HTTP/TLS {bestSummary!.HttpPassed}/{bestSummary.HttpTotal}, ping {bestSummary.PingPassed}/{bestSummary.PingTotal}.",
             recommendedPath,
             Completed: true,
@@ -913,7 +915,7 @@ public static class AdminCommandRouter
         };
         WriteZapretTestProgress(progressPath, progress);
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(120);
         while (DateTime.UtcNow < deadline)
         {
             if (File.Exists(responsePath))
@@ -927,7 +929,7 @@ public static class AdminCommandRouter
             Thread.Sleep(100);
         }
 
-        return YouTubeSpeedTestMeasurement.Failed("Основное окно не ответило на запрос проверки скорости YouTube за 45 секунд.");
+        return YouTubeSpeedTestMeasurement.Failed("Основное окно не ответило на запрос проверки скорости YouTube за 120 секунд.");
     }
 
     internal static string RequireYouTubeSpeedReplyPath(string progressPath, string requestId)

@@ -10,9 +10,11 @@ internal sealed record ZapretStrategyRanking(
     int PingTotal,
     double? YouTubeSpeedMbps = null)
 {
+    internal static double? NormalizeYouTubeSpeed(double? speedMbps) => speedMbps is > 0 ? speedMbps : null;
+
     internal static IReadOnlyList<ZapretStrategyRanking> Order(IEnumerable<ZapretStrategyRanking> strategies) => strategies
-        .OrderByDescending(strategy => strategy.YouTubeSpeedMbps.HasValue)
-        .ThenByDescending(strategy => strategy.YouTubeSpeedMbps)
+        .OrderByDescending(strategy => NormalizeYouTubeSpeed(strategy.YouTubeSpeedMbps).HasValue)
+        .ThenByDescending(strategy => NormalizeYouTubeSpeed(strategy.YouTubeSpeedMbps))
         .ThenByDescending(strategy => strategy.HttpPassed)
         .ThenByDescending(strategy => strategy.PingPassed)
         .ThenBy(strategy => strategy.Path, Comparer<string>.Create(ZapretStrategyComparer.ComparePaths))

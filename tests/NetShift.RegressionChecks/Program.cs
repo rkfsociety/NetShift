@@ -164,29 +164,39 @@ static void CheckZapretStrategyRankingPersistence()
     [
         new ZapretStrategyRanking(@"C:\zapret\general12.bat", 36, 36, 17, 17, 5.4),
         new ZapretStrategyRanking(@"C:\zapret\general2.bat", 36, 36, 17, 17, 2.1),
-        new ZapretStrategyRanking(@"C:\zapret\general3.bat", 36, 36, 17, 17)
+        new ZapretStrategyRanking(@"C:\zapret\general3.bat", 36, 36, 17, 17),
+        new ZapretStrategyRanking(@"C:\zapret\general0.bat", 0, 0, 0, 0, 0)
     ]);
     if (Path.GetFileName(speedOrdered[0].Path) != "general12.bat" ||
         Path.GetFileName(speedOrdered[1].Path) != "general2.bat" ||
-        speedOrdered[2].YouTubeSpeedMbps is not null)
-        throw new InvalidOperationException("Saved strategies must prioritize measured YouTube throughput over legacy connectivity scores.");
+        speedOrdered[2].Path != @"C:\zapret\general3.bat" ||
+        ZapretStrategyRanking.NormalizeYouTubeSpeed(speedOrdered[3].YouTubeSpeedMbps) is not null)
+        throw new InvalidOperationException("Saved strategies must ignore legacy zero YouTube results and prioritize only positive measured throughput.");
 }
 
 static void CheckYouTubeSpeedTesting()
 {
     var fast = YouTubeSpeedTestMeasurement.FromTransfer(1_000_000, 1_000);
     var empty = YouTubeSpeedTestMeasurement.FromTransfer(0, 1_000);
-    if (fast.Mbps is not 8d || fast.Error is not null || empty.Mbps is not 0d || empty.Error is null)
-        throw new InvalidOperationException("YouTube transfer samples must convert bytes and elapsed time into megabits per second.");
+    var tiny = YouTubeSpeedTestMeasurement.FromTransfer(1, 1_000);
+    if (fast.Mbps is not 8d || fast.Error is not null || empty.Mbps is not null || empty.Error is null ||
+        tiny.Mbps is not > 0 || YouTubeSpeedTestMeasurement.FormatMbps(tiny.Mbps.Value) != $"<{0.01:F2}" ||
+        YouTubeSpeedTestMeasurement.FormatMbps(0) != "не измерена")
+        throw new InvalidOperationException("YouTube samples must distinguish missing data from measured throughput and avoid formatting tiny rates as zero.");
 
     var fullConnectivity = new ZapretConnectivitySummary(36, 36, 16, 16, [], []);
     if (ZapretConnectivityTester.CompareScores(fullConnectivity, fullConnectivity, 5, 1) <= 0 ||
         ZapretConnectivityTester.CompareScores(fullConnectivity, fullConnectivity, 1, 5) >= 0)
         throw new InvalidOperationException("Strategy selection must prioritize measured YouTube throughput before connectivity ties.");
 
+    var unsupported = JsonSerializer.Deserialize<YouTubeSpeedTestMeasurement>(
+        JsonSerializer.Serialize(YouTubeSpeedTestMeasurement.Unsupported("runtime missing")))!;
     if (!ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.FromTransfer(200_000, 1_000)) ||
+        !ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.Failed("no video data")) ||
+        !ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, empty) ||
         ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.FromTransfer(500_000, 1_000)) ||
-        ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, YouTubeSpeedTestMeasurement.Unsupported("runtime missing")))
+        !unsupported.IsUnsupported ||
+        ZapretConnectivityTester.ShouldRetryFullSweep(fullConnectivity, unsupported))
         throw new InvalidOperationException("A slow YouTube sample must retry the full strategy sweep; unsupported speed measurement must keep legacy fallback behavior.");
 }
 

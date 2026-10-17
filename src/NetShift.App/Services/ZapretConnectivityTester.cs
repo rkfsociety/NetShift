@@ -147,6 +147,8 @@ internal static class ZapretConnectivityTester
         double? leftYouTubeMbps = null,
         double? rightYouTubeMbps = null)
     {
+        leftYouTubeMbps = ZapretStrategyRanking.NormalizeYouTubeSpeed(leftYouTubeMbps);
+        rightYouTubeMbps = ZapretStrategyRanking.NormalizeYouTubeSpeed(rightYouTubeMbps);
         if (leftYouTubeMbps.HasValue || rightYouTubeMbps.HasValue)
         {
             var measuredComparison = leftYouTubeMbps.HasValue.CompareTo(rightYouTubeMbps.HasValue);
@@ -167,6 +169,7 @@ internal static class ZapretConnectivityTester
         summary.HttpTotal + summary.PingTotal == 0 ||
         summary.HttpPassed != summary.HttpTotal ||
         summary.PingPassed != summary.PingTotal ||
+        youtubeSpeed is { Mbps: null, IsUnsupported: false } ||
         youtubeSpeed?.Mbps is double mbps && mbps < YouTubeSpeedTestMeasurement.MinimumRecommended720pMbps;
 
     private static ZapretConnectivityTarget? ParseTarget(string name, string value)

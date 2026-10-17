@@ -81,7 +81,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.085";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.086";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -846,15 +846,20 @@ public partial class MainWindow : Window
             : [];
 
         var selectedPath = StrategyComboBox.SelectedValue as string;
-        var rankingOrder = _settings.ZapretStrategyRankings
+        var orderedRankings = ZapretStrategyRanking.Order(_settings.ZapretStrategyRankings);
+        var rankingOrder = orderedRankings
             .Select((ranking, index) => (ranking, index))
             .Where(entry => !string.IsNullOrWhiteSpace(entry.ranking.Path))
             .GroupBy(entry => entry.ranking.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Min(entry => entry.index), StringComparer.OrdinalIgnoreCase);
-        var youtubeSpeedByPath = _settings.ZapretStrategyRankings
+        var youtubeSpeedByPath = orderedRankings
             .Where(ranking => !string.IsNullOrWhiteSpace(ranking.Path))
             .GroupBy(ranking => ranking.Path, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().YouTubeSpeedMbps, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(group => group.Key, group => ZapretStrategyRanking.NormalizeYouTubeSpeed(group.First().YouTubeSpeedMbps), StringComparer.OrdinalIgnoreCase);
+        var legacyZeroSpeedPaths = orderedRankings
+            .Where(ranking => ranking.YouTubeSpeedMbps is <= 0 && !string.IsNullOrWhiteSpace(ranking.Path))
+            .Select(ranking => ranking.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var items = strategies.Select(path =>
         {
             var fullPath = Path.GetFullPath(path);
@@ -862,7 +867,8 @@ public partial class MainWindow : Window
             _settings.ZapretStrategyHealth.TryGetValue(healthKey, out var legacyHealthy);
             _settings.ZapretStrategyStatuses.TryGetValue(healthKey, out var savedStatus);
             var healthStatus = ZapretStrategyHealthRules.FromStoredStatus(savedStatus, legacyHealthy);
-            var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase);
+            var isRecommended = fullPath.Equals(_settings.RecommendedZapretStrategyPath, StringComparison.OrdinalIgnoreCase) &&
+                !legacyZeroSpeedPaths.Contains(fullPath);
             youtubeSpeedByPath.TryGetValue(fullPath, out var youtubeSpeedMbps);
             return new StrategyItem(Path.GetFileName(path), fullPath, healthStatus, isRecommended, youtubeSpeedMbps);
         })
@@ -2132,8 +2138,8 @@ public partial class MainWindow : Window
             SaveSettings();
             UpdateZapretInventory();
 
-            var youtubeSpeedText = youtubeSpeed.Mbps is double mbps
-                ? $"YouTube {mbps:F2} Мбит/с"
+            var youtubeSpeedText = youtubeSpeed.Mbps is > 0 and double mbps
+                ? $"YouTube {YouTubeSpeedTestMeasurement.FormatMbps(mbps)} Мбит/с"
                 : $"YouTube: {youtubeSpeed.Error}";
             ZapretHealthStatusText.Text = $"{displayStrategyName}: {youtubeSpeedText}; HTTP/TLS {result.HttpPassed}/{result.HttpTotal}; ping {result.PingPassed}/{result.PingTotal}.";
             SetYouTubeSpeedStatus(youtubeSpeed);
@@ -2342,10 +2348,10 @@ public partial class MainWindow : Window
             _ => (System.Windows.Media.Brush)FindResource("MutedBrush")
         };
         ZapretHealthStatusText.Text = progress.Phase == "youtube-speed-check"
-            ? $"Измеряю реальную загрузку видеопотока YouTube без звука: {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
+            ? $"Измеряю загрузку видео YouTube 30 секунд без звука: {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
             : progress.Phase == "youtube-speed-scored"
-                ? progress.YouTubeSpeedMbps is double youtubeMbps
-                    ? $"YouTube: {youtubeMbps:F2} Мбит/с для {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
+                ? progress.YouTubeSpeedMbps is > 0 and double youtubeMbps
+                    ? $"YouTube: {YouTubeSpeedTestMeasurement.FormatMbps(youtubeMbps)} Мбит/с для {Path.GetFileNameWithoutExtension(progress.StrategyPath)}."
                     : $"Скорость YouTube не измерена: {progress.YouTubeSpeedError}"
                 : progress.TotalProbeCount > 0 && (progress.Phase is "checking" or "scored")
             ? $"Проверяю {progress.CompletedProbeCount}/{progress.TotalProbeCount}"
@@ -2964,7 +2970,7 @@ public partial class MainWindow : Window
         double? YouTubeSpeedMbps)
     {
         public Visibility HealthVisibility => HealthStatus == ZapretStrategyHealthStatus.Unknown ? Visibility.Collapsed : Visibility.Visible;
-        public string YouTubeSpeedLabel => YouTubeSpeedMbps is double mbps ? $"YouTube {mbps:F2} Мбит/с" : string.Empty;
+        public string YouTubeSpeedLabel => YouTubeSpeedMbps is > 0 and double mbps ? $"YouTube {YouTubeSpeedTestMeasurement.FormatMbps(mbps)} Мбит/с" : string.Empty;
         public System.Windows.Media.Brush HealthBrush => HealthStatus switch
         {
             ZapretStrategyHealthStatus.Green => System.Windows.Media.Brushes.LightGreen,
@@ -2978,9 +2984,9 @@ public partial class MainWindow : Window
             ZapretStrategyHealthStatus.Yellow => "Часть проверок прошла",
             ZapretStrategyHealthStatus.Red => "Ни одна проверка не прошла",
             _ => "Стратегия ещё не проверялась"
-        } + (YouTubeSpeedMbps is double mbps ? $"; скорость YouTube {mbps:F2} Мбит/с" : string.Empty) +
+        } + (YouTubeSpeedMbps is > 0 and double mbps ? $"; скорость YouTube {YouTubeSpeedTestMeasurement.FormatMbps(mbps)} Мбит/с" : string.Empty) +
             (IsRecommended
-                ? YouTubeSpeedMbps.HasValue
+                ? ZapretStrategyRanking.NormalizeYouTubeSpeed(YouTubeSpeedMbps).HasValue
                     ? ". Лучшая по измеренной скорости YouTube среди проверенных"
                     : ". Лучшая по HTTP/TLS и ping среди проверенных"
                 : string.Empty);
