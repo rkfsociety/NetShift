@@ -818,6 +818,9 @@ public static class AdminCommandRouter
                 batchProcess?.Dispose();
             }
 
+            if (candidateOnly && ZapretConnectivityTester.ShouldRetryFullSweep(summary))
+                return RunZapretStrategyTestSweep(folder, progressPath);
+
             testedCount++;
             if (summary is not null)
             {
@@ -1054,7 +1057,11 @@ public static class AdminCommandRouter
 
         for (var attempt = 0; attempt < 25; attempt++)
         {
-            if (IsZapretProcessRunning(executable)) return process;
+            if (IsZapretProcessRunning(executable))
+            {
+                Thread.Sleep(300);
+                return process;
+            }
             Thread.Sleep(200);
         }
 

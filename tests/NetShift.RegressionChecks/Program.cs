@@ -105,6 +105,14 @@ static void CheckZapretCurlModesAndRanking()
         ZapretConnectivityTester.CompareScores(moreHttp, morePing) <= 0)
         throw new InvalidOperationException("Zapret strategy ranking must prioritize HTTP/TLS successes, then ping successes.");
 
+    var alt9 = new ZapretConnectivitySummary(35, 36, 16, 16, [], []);
+    var alt12 = new ZapretConnectivitySummary(36, 36, 16, 16, [], []);
+    if (ZapretConnectivityTester.CompareScores(alt12, alt9) <= 0 ||
+        !ZapretConnectivityTester.ShouldRetryFullSweep(alt9) ||
+        ZapretConnectivityTester.ShouldRetryFullSweep(alt12) ||
+        !ZapretConnectivityTester.ShouldRetryFullSweep(null))
+        throw new InvalidOperationException("A partially passing saved strategy must trigger a full zapret sweep; ALT12's complete result must outrank ALT9's partial result.");
+
     var discord = ZapretConnectivityTester.ParseTargets("DiscordMain = \"https://discord.com\"")[0];
     var targetResult = new ZapretConnectivityTargetResult(discord,
     [

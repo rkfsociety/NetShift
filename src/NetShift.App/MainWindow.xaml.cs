@@ -78,7 +78,7 @@ public partial class MainWindow : Window
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
             : NetShiftUpdateService.CurrentVersion;
         if (string.IsNullOrWhiteSpace(appVersion))
-            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.082";
+            appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.3.083";
         AboutVersionText.Text = $"Версия NetShift {appVersion}";
         _trayIcon = screenshotPreview ? new System.Windows.Forms.NotifyIcon() : CreateTrayIcon();
         if (!screenshotPreview)
@@ -1794,7 +1794,7 @@ public partial class MainWindow : Window
         var prompt = _settings.BasicZapretAutoStrategy
             ? savedBestStrategyPath is null
                 ? $"Проверить список стратегий zapret, сохранить рейтинг и запустить лучшую {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора."
-                : $"Дополнительно проверить лучшую сохранённую стратегию {Path.GetFileName(savedBestStrategyPath)} и запустить её {runtimeMode}? Windows запросит подтверждение администратора."
+                : $"Проверить сохранённую стратегию {Path.GetFileName(savedBestStrategyPath)}; если часть тестов завершится ошибкой, проверить весь список и запустить лучший вариант {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора."
             : $"Проверить весь список стратегий, затем запустить выбранную {Path.GetFileName(requestedStrategyPath)} {runtimeMode}? Пакетные скрипты могут изменить обработку сетевого трафика. Windows запросит подтверждение администратора.";
         if (ThemedDialog.Show(this, prompt, "Подключить zapret", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             return false;
@@ -2192,7 +2192,7 @@ public partial class MainWindow : Window
         ZapretTestPhaseText.Foreground = GetAccentBrush();
         ZapretTestStrategyText.Text = startAfterCheck
             ? _isZapretRankedCandidateCheck
-                ? $"Лидер сохранённого рейтинга проверяется; затем запускается {(useService ? "как служба Windows" : "в фоне без службы")} ."
+                ? $"Лидер рейтинга проверяется; при ошибках пройдёт полный перебор, затем лучший вариант запустится {(useService ? "как служба Windows" : "в фоне без службы")} ."
                 : $"Оригинальные general*.bat проверяются по очереди; затем стратегия запустится {(useService ? "как служба Windows" : "в фоне без службы")} ."
             : "Оригинальные general*.bat запускаются по очереди и останавливаются после проверки. Служба Windows не меняется.";
         ZapretTestStrategyText.Visibility = Visibility.Collapsed;
@@ -2357,7 +2357,7 @@ public partial class MainWindow : Window
         }
         if (progress.Completed)
         {
-            if (_isZapretRankedCandidateCheck)
+            if (_isZapretRankedCandidateCheck && progress.StrategyCount == 1)
             {
                 _settings.ZapretStrategyRankings.RemoveAll(ranking =>
                     string.Equals(ranking.Path, _rankedCandidatePath, StringComparison.OrdinalIgnoreCase));

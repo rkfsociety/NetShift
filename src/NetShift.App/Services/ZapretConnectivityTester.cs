@@ -147,6 +147,12 @@ internal static class ZapretConnectivityTester
         return httpComparison != 0 ? httpComparison : left.PingPassed.CompareTo(right.PingPassed);
     }
 
+    internal static bool ShouldRetryFullSweep(ZapretConnectivitySummary? summary) =>
+        summary is null ||
+        summary.HttpTotal + summary.PingTotal == 0 ||
+        summary.HttpPassed != summary.HttpTotal ||
+        summary.PingPassed != summary.PingTotal;
+
     private static ZapretConnectivityTarget? ParseTarget(string name, string value)
     {
         if (value.StartsWith("PING:", StringComparison.OrdinalIgnoreCase))
