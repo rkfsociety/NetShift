@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NetShift.App</RootNamespace>
     <AssemblyName>NetShift</AssemblyName>
-    <Version>0.3.087</Version>
+    <Version>0.3.088</Version>
     <ApplicationIcon>Assets\NetShift.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup Condition="'$(NetShiftUpdateRepository)' != ''">

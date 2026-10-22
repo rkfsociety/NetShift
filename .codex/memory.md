@@ -5,7 +5,7 @@
 ## Назначение и платформа
 
 - NetShift — Windows-приложение для настройки DNS и управления zapret от Flowseal; пользовательское поведение описано в `README.md`.
-- UI — WPF с Windows Forms для значка в трее; основной проект `src/NetShift.App/NetShift.App.csproj` на `net10.0-windows`. Служба DNS — отдельный проект `src/NetShift.DnsService/DnsService.csproj`.
+- UI — WPF с Windows Forms для значка в трее; основной проект `src/NetShift.App/NetShift.App.csproj` на `net10.0-windows10.0.19041.0` (Windows API baseline для заявленной поддержки Windows 10 22H2 Home/Pro, build 19045). Служба DNS — отдельный проект `src/NetShift.DnsService/DnsService.csproj` с тем же baseline.
 - В репозитории нет `.sln`: приложение, DNS-служба и регрессионная программа собираются/запускаются отдельными проектами.
 
 ## Карта кода и потоки выполнения
