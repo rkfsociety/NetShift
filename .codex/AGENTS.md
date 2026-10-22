@@ -13,6 +13,7 @@
 
 ## DNS
 
+- По умолчанию выбран Native DNS Windows. `AppSettings.SettingsSchemaVersion` помечает одноразовую миграцию: файл настроек без версии переводит `NativeDnsMode` на `true`; после миграции последующий сохранённый выбор Legacy остаётся без изменений. Миграция меняет только выбор режима в приложении, системный DNS меняется после нажатия «Применить DNS».
 - Пресеты определены в `src/NetShift.App/Models/DnsProvider.cs`: Cloudflare, Google Public DNS, Quad9, AdGuard DNS, Comss.one, Xbox DNS, DNS-AI и «Свой DNS».
 - DNS-AI (`DnsAiProviderService`) загружает адреса и DoH-шаблон с https://dns-ai.ru/#setup при старте; есть встроенные резервные значения.
 - Comss.one: Windows preset — IPv4 `83.220.169.155, 212.109.195.93`, IPv6 отсутствует в опубликованном списке, DoH `https://dns.comss.one/dns-query`. Адрес `195.133.25.16` на странице Comss приведён для маршрутизаторов; Windows инструкция использует стандартные IP + DoH-шаблон.

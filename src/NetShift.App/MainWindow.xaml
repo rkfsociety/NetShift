@@ -400,14 +400,14 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <Border x:Name="LegacyModeCard" CornerRadius="4" Padding="14">
                     <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=LegacyModeRadio}" Value="True"><Setter Property="Background" Value="{StaticResource AccentDarkBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Border.Style>
-                    <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" IsChecked="True" Foreground="White">
+                    <RadioButton x:Name="LegacyModeRadio" GroupName="DnsMode" Foreground="White">
                       <StackPanel Margin="6,0,0,0"><TextBlock Text="Legacy: локальный прокси" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="Локальный прокси шифрует DNS через DoH." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
                     </RadioButton>
                   </Border>
                   <Border x:Name="NativeModeCard" Grid.Column="2" CornerRadius="4" Padding="14">
                     <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=NativeModeRadio}" Value="True"><Setter Property="Background" Value="{StaticResource AccentDarkBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Border.Style>
-                    <RadioButton x:Name="NativeModeRadio" GroupName="DnsMode" Foreground="{StaticResource TextBrush}">
+                    <RadioButton x:Name="NativeModeRadio" GroupName="DnsMode" IsChecked="True" Foreground="{StaticResource TextBrush}">
                       <StackPanel Margin="6,0,0,0"><TextBlock Text="Native: DNS Windows" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="Системный DNS Windows." Foreground="{StaticResource MutedBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0" /></StackPanel>
                     </RadioButton>

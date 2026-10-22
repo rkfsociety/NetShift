@@ -35,6 +35,7 @@
 ## Локальные данные и конфигурация
 
 - UI-настройки пользователя: `%LocalAppData%\NetShift\settings.json`; структура `AppSettings` объявлена в конце `MainWindow.xaml.cs`.
+- Native DNS Windows выбран по умолчанию. `LoadSettings` переводит файлы без `SettingsSchemaVersion` на Native один раз и записывает версию схемы; последующие сохранённые выборы Legacy сохраняются. Эта миграция не применяет DNS к Windows.
 - Установленный UI: `%LocalAppData%\Programs\NetShift\NetShift.exe`. Загруженные пакеты zapret устанавливаются в `NetShift\zapret-<version>` в корне системного диска.
 - Кэш скачанных списков и архивов: `%LocalAppData%\NetShift\Downloads`; staging и резервные данные обновления приложения: `%LocalAppData%\NetShift\Updates`.
 - Системное состояние DNS хранится в указанных выше ветках HKLM; изменение системного состояния выполняется только с повышенными правами. Не переносить пользовательские настройки, временные файлы, секреты или данные машины в `.codex/`.

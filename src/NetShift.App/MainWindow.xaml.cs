@@ -23,6 +23,7 @@ namespace NetShift.App;
 
 public partial class MainWindow : Window
 {
+    private const int CurrentSettingsSchemaVersion = 1;
     private static readonly JsonSerializerOptions ZapretProgressJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly string _settingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NetShift", "settings.json");
@@ -755,12 +756,25 @@ public partial class MainWindow : Window
         try
         {
             if (File.Exists(_settingsPath))
-                _settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_settingsPath)) ?? new AppSettings();
+            {
+                _settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_settingsPath)) ??
+                    new AppSettings { SettingsSchemaVersion = CurrentSettingsSchemaVersion };
+                if (_settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion)
+                {
+                    _settings.NativeDnsMode = true;
+                    _settings.SettingsSchemaVersion = CurrentSettingsSchemaVersion;
+                    SaveSettings();
+                }
+            }
+            else
+            {
+                _settings = new AppSettings { SettingsSchemaVersion = CurrentSettingsSchemaVersion };
+            }
             _settings.ZapretStrategyRankings ??= [];
         }
         catch
         {
-            _settings = new AppSettings();
+            _settings = new AppSettings { SettingsSchemaVersion = CurrentSettingsSchemaVersion };
         }
     }
 
@@ -2974,6 +2988,7 @@ public partial class MainWindow : Window
     private sealed class AppSettings
     {
         public AppSettings() { }
+        public int SettingsSchemaVersion { get; set; }
         public string? ZapretFolder { get; set; }
         public bool CheckZapretUpdatesBeforeStart { get; set; }
         public bool InitialZapretStrategyCheckCompleted { get; set; }
