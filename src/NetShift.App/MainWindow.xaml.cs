@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         _powerButtonOff = new CroppedBitmap(buttonSprite, new Int32Rect(325, 90, 600, 600));
         _powerButtonOn = new CroppedBitmap(buttonSprite, new Int32Rect(1050, 90, 600, 600));
         BasicPowerButtonFace.Source = _powerButtonOff;
+        BasicPowerButtonFaceActive.Source = _powerButtonOn;
         var appVersion = screenshotPreview
             ? Regex.Match(typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty,
                 "^(?<version>\\d+\\.\\d+\\.\\d+)").Groups["version"].Value
@@ -260,6 +261,17 @@ public partial class MainWindow : Window
         if (page is not ("basic" or "dns" or "zapret" or "settings"))
             page = "dns";
 
+        FrameworkElement previousPage = BasicPage.Visibility == Visibility.Visible ? BasicPage
+            : DnsPage.Visibility == Visibility.Visible ? DnsPage
+            : ZapretPage.Visibility == Visibility.Visible ? ZapretPage
+            : SettingsPage;
+        FrameworkElement nextPage = page switch
+        {
+            "basic" => BasicPage,
+            "zapret" => ZapretPage,
+            "settings" => SettingsPage,
+            _ => DnsPage
+        };
         var isBasicMode = page == "basic";
         var targetWidth = isBasicMode ? 560d : 1120d;
         if (Width != targetWidth)
@@ -277,6 +289,7 @@ public partial class MainWindow : Window
         DnsPage.Visibility = page == "dns" ? Visibility.Visible : Visibility.Collapsed;
         ZapretPage.Visibility = page == "zapret" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        if (!ReferenceEquals(previousPage, nextPage)) FadeInElement(nextPage);
         PageTitleText.Text = page switch
         {
             "basic" => "Базовый режим",
@@ -304,7 +317,7 @@ public partial class MainWindow : Window
                 BasicModeProviderText.Text = "Используется: Cloudflare";
                 BasicConnectionButtonText.Text = "Переподключить";
                 BasicModeDetailText.Text = "Нажмите, чтобы обновить DNS и zapret к выбранным переключателям.";
-                BasicPowerButtonFace.Source = _powerButtonOn;
+                SetBasicPowerButtonFace(active: true);
                 UpdatePowerHalo(active: true);
             }
             else
@@ -319,6 +332,23 @@ public partial class MainWindow : Window
             _settings.LastSelectedPage = page;
             SaveSettings();
         }
+    }
+
+    private void FadeInElement(FrameworkElement element)
+    {
+        element.BeginAnimation(UIElement.OpacityProperty, null);
+        element.Opacity = 1;
+        if (_isScreenshotPreview || !IsLoaded || !SystemParameters.ClientAreaAnimation) return;
+
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new System.Windows.Media.Animation.CubicEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+            },
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+        };
+        element.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     private void SetNavigationButtonState(System.Windows.Controls.Button button, bool isSelected)
@@ -350,10 +380,23 @@ public partial class MainWindow : Window
         if (_powerHaloAnimating == active) return;
         _powerHaloAnimating = active;
         var revision = ++_powerHaloAnimationRevision;
-        var scale = (ScaleTransform)BasicPowerHalo.RenderTransform;
         var glow = (System.Windows.Media.Effects.DropShadowEffect)BasicPowerHalo.Effect;
         var orbitRotation = (RotateTransform)BasicPowerOrbit.RenderTransform;
-        var rippleScale = (ScaleTransform)BasicPowerRipple.RenderTransform;
+        if (_isScreenshotPreview || !SystemParameters.ClientAreaAnimation)
+        {
+            BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, null);
+            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, null);
+            BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty, null);
+            orbitRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+            BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty, null);
+            BasicPowerHalo.Opacity = active ? 0.38 : 0;
+            glow.BlurRadius = 18;
+            glow.Opacity = active ? 0.38 : 0;
+            BasicPowerOrbit.Opacity = active ? 0.46 : 0;
+            orbitRotation.Angle = 0;
+            BasicPowerRipple.Opacity = 0;
+            return;
+        }
         var easing = new System.Windows.Media.Animation.CubicEase
         {
             EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
@@ -372,12 +415,8 @@ public partial class MainWindow : Window
 
                 BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, null);
                 BasicPowerHalo.Opacity = 0;
-                scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                scale.ScaleX = scale.ScaleY = 1;
-                glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty, null);
                 glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, null);
-                glow.BlurRadius = 14;
+                glow.BlurRadius = 18;
                 glow.Opacity = 0;
                 BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty, null);
                 BasicPowerOrbit.Opacity = 0;
@@ -385,17 +424,8 @@ public partial class MainWindow : Window
                 orbitRotation.Angle = 0;
                 BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty, null);
                 BasicPowerRipple.Opacity = 0;
-                rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-                rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                rippleScale.ScaleX = rippleScale.ScaleY = 1;
             };
             BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, haloFade);
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1, transitionDuration) { EasingFunction = easing });
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1, transitionDuration) { EasingFunction = easing });
-            glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 14, transitionDuration) { EasingFunction = easing });
             glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
                 new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0, transitionDuration) { EasingFunction = easing });
             BasicPowerOrbit.BeginAnimation(UIElement.OpacityProperty,
@@ -404,10 +434,6 @@ public partial class MainWindow : Window
                 new System.Windows.Media.Animation.DoubleAnimation(orbitRotation.Angle, orbitRotation.Angle + 12, transitionDuration) { EasingFunction = easing });
             BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty,
                 new System.Windows.Media.Animation.DoubleAnimation(BasicPowerRipple.Opacity, 0, transitionDuration) { EasingFunction = easing });
-            rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(rippleScale.ScaleX, 1, transitionDuration) { EasingFunction = easing });
-            rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(rippleScale.ScaleY, 1, transitionDuration) { EasingFunction = easing });
             return;
         }
 
@@ -416,7 +442,7 @@ public partial class MainWindow : Window
             EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut
         };
         var orbitAngle = orbitRotation.Angle;
-        var pulseDuration = TimeSpan.FromSeconds(3.2);
+        var pulseDuration = TimeSpan.FromSeconds(3.6);
         var repeat = System.Windows.Media.Animation.RepeatBehavior.Forever;
         var haloEntry = new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0.38, transitionDuration)
         {
@@ -424,12 +450,6 @@ public partial class MainWindow : Window
         };
         haloEntry.Completed += (_, _) => StartPowerHaloBreathing(revision, pulseDuration, repeat, pulseEasing);
         BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty, haloEntry);
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1.04, transitionDuration) { EasingFunction = easing });
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1.04, transitionDuration) { EasingFunction = easing });
-        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 18, transitionDuration) { EasingFunction = easing });
         glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
             new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0.38, transitionDuration) { EasingFunction = easing });
 
@@ -461,10 +481,6 @@ public partial class MainWindow : Window
             }
         });
         BasicPowerRipple.BeginAnimation(UIElement.OpacityProperty, rippleOpacity);
-        rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.9, 1.25, rippleDuration) { EasingFunction = easing });
-        rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.9, 1.25, rippleDuration) { EasingFunction = easing });
     }
 
     private void StartPowerHaloBreathing(int revision, TimeSpan duration,
@@ -473,43 +489,42 @@ public partial class MainWindow : Window
     {
         if (revision != _powerHaloAnimationRevision || !_powerHaloAnimating) return;
 
-        var scale = (ScaleTransform)BasicPowerHalo.RenderTransform;
         var glow = (System.Windows.Media.Effects.DropShadowEffect)BasicPowerHalo.Effect;
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleX, 1.08, duration)
-            {
-                AutoReverse = true,
-                RepeatBehavior = repeat,
-                EasingFunction = easing
-            });
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(scale.ScaleY, 1.08, duration)
-            {
-                AutoReverse = true,
-                RepeatBehavior = repeat,
-                EasingFunction = easing
-            });
-        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(glow.BlurRadius, 24, duration)
-            {
-                AutoReverse = true,
-                RepeatBehavior = repeat,
-                EasingFunction = easing
-            });
         glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0.62, duration)
+            new System.Windows.Media.Animation.DoubleAnimation(glow.Opacity, 0.5, duration)
             {
                 AutoReverse = true,
                 RepeatBehavior = repeat,
                 EasingFunction = easing
             });
         BasicPowerHalo.BeginAnimation(UIElement.OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0.54, duration)
+            new System.Windows.Media.Animation.DoubleAnimation(BasicPowerHalo.Opacity, 0.48, duration)
             {
                 AutoReverse = true,
                 RepeatBehavior = repeat,
                 EasingFunction = easing
             });
+    }
+
+    private void SetBasicPowerButtonFace(bool active)
+    {
+        var activeFace = BasicPowerButtonFaceActive;
+        var currentOpacity = activeFace.Opacity;
+        var targetOpacity = active ? 1d : 0d;
+        activeFace.BeginAnimation(UIElement.OpacityProperty, null);
+        activeFace.Opacity = targetOpacity;
+        if (_isScreenshotPreview || !IsLoaded || !SystemParameters.ClientAreaAnimation || Math.Abs(currentOpacity - targetOpacity) < 0.001)
+            return;
+
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(currentOpacity, targetOpacity, TimeSpan.FromMilliseconds(260))
+        {
+            EasingFunction = new System.Windows.Media.Animation.CubicEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut
+            },
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+        };
+        activeFace.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     private void UpdateBasicModeStatus()
@@ -573,7 +588,7 @@ public partial class MainWindow : Window
             : selectionMatches || anyActive && !hasSelection ? "Отключить"
             : anyActive ? "Переподключить"
             : "Включить";
-        BasicPowerButtonFace.Source = anyActive ? _powerButtonOn : _powerButtonOff;
+        SetBasicPowerButtonFace(anyActive);
         UpdatePowerHalo(anyActive);
         var busy = _isBasicConnectionActionRunning || _isZapretStrategyTestRunning || _isZapretServiceActionRunning;
         BasicConnectionButton.IsEnabled = (hasSelection || anyActive) && !busy;
@@ -2218,6 +2233,7 @@ public partial class MainWindow : Window
                 : $"Оригинальные general*.bat проверяются по очереди; затем стратегия запустится {(useService ? "как служба Windows" : "в фоне без службы")} ."
             : "Оригинальные general*.bat запускаются по очереди и останавливаются после проверки. Служба Windows не меняется.";
         ZapretTestStrategyText.Visibility = Visibility.Collapsed;
+        ZapretTestProgressBar.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
         ZapretTestProgressBar.IsIndeterminate = false;
         ZapretTestProgressBar.Minimum = 0;
         ZapretTestProgressBar.Maximum = 1;
@@ -2378,9 +2394,27 @@ public partial class MainWindow : Window
                 : $"Проверено {progress.StrategyIndex} из {progress.StrategyCount}. Служба Windows не меняется."
             : $"{Path.GetFileNameWithoutExtension(progress.StrategyPath)} · вариант {progress.StrategyIndex} из {progress.StrategyCount}.";
         ZapretTestStrategyText.Visibility = progress.Completed ? Visibility.Visible : Visibility.Collapsed;
+        var progressValueProperty = System.Windows.Controls.Primitives.RangeBase.ValueProperty;
+        var currentProgress = ZapretTestProgressBar.Value;
+        ZapretTestProgressBar.BeginAnimation(progressValueProperty, null);
         ZapretTestProgressBar.Minimum = 0;
         ZapretTestProgressBar.Maximum = Math.Max(1, progress.TotalProbeCount);
-        ZapretTestProgressBar.Value = Math.Clamp(progress.CompletedProbeCount, 0, Math.Max(1, progress.TotalProbeCount));
+        var targetProgress = Math.Clamp(progress.CompletedProbeCount, 0, (int)ZapretTestProgressBar.Maximum);
+        currentProgress = Math.Clamp(currentProgress, ZapretTestProgressBar.Minimum, ZapretTestProgressBar.Maximum);
+        ZapretTestProgressBar.Value = targetProgress;
+        if (targetProgress > currentProgress && !_isScreenshotPreview && SystemParameters.ClientAreaAnimation)
+        {
+            var progressAnimation = new System.Windows.Media.Animation.DoubleAnimation(currentProgress, targetProgress,
+                TimeSpan.FromMilliseconds(150))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+                },
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+            };
+            ZapretTestProgressBar.BeginAnimation(progressValueProperty, progressAnimation);
+        }
         ZapretTestProgressBar.Visibility = progress.Completed ? Visibility.Collapsed : Visibility.Visible;
         if (_isBasicConnectionActionRunning)
         {
@@ -2591,6 +2625,11 @@ public partial class MainWindow : Window
         var visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
         PackageSettingsPanel.Visibility = visibility;
         ToolsAndDiagnosticsPanel.Visibility = visibility;
+        if (isExpanded)
+        {
+            FadeInElement(PackageSettingsPanel);
+            FadeInElement(ToolsAndDiagnosticsPanel);
+        }
         ZapretAdvancedToggleButton.Content = isExpanded
             ? "Дополнительные настройки и диагностика ▲"
             : "Дополнительные настройки и диагностика ▼";

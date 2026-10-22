@@ -189,46 +189,40 @@
 
             <Grid Height="214">
               <Grid Width="326" Height="258" Margin="0,-22,0,-22" HorizontalAlignment="Center">
-                <Ellipse Width="316" Height="242" Opacity="0.78">
+                <Ellipse Width="248" Height="248" Opacity="0.78">
                   <Ellipse.Fill>
-                    <RadialGradientBrush Center="0.5,0.46" GradientOrigin="0.5,0.46" RadiusX="0.62" RadiusY="0.66">
+                    <RadialGradientBrush Center="0.5,0.48" GradientOrigin="0.5,0.48" RadiusX="0.62" RadiusY="0.62">
                       <GradientStop Color="#2812A5D6" Offset="0" />
                       <GradientStop Color="#180A3448" Offset="0.62" />
                       <GradientStop Color="#000A3448" Offset="1" />
                     </RadialGradientBrush>
                   </Ellipse.Fill>
                 </Ellipse>
-                <Ellipse Width="326" Height="244" Stroke="#0E425B" StrokeThickness="1.5" Opacity="0.9" />
-                <Ellipse Width="310" Height="228" Stroke="#0A2C3D" StrokeThickness="13" Opacity="0.78" />
-                <Ellipse Width="264" Height="210" Stroke="#0B3549" StrokeThickness="1.4" Opacity="0.9" />
-                <Path Data="M 50,38 L 76,60 M 276,38 L 250,60 M 30,107 L 57,107 M 296,107 L 269,107 M 50,176 L 76,154 M 276,176 L 250,154"
-                      Stroke="#0C3A4E" StrokeThickness="1.3" Opacity="0.8" />
-                <Path Data="M 31,74 L 38,76 M 28,83 L 36,85 M 27,92 L 36,94 M 26,101 L 35,103 M 26,110 L 35,112 M 27,119 L 36,121 M 28,128 L 36,130 M 31,137 L 38,139 M 295,74 L 288,76 M 298,83 L 290,85 M 299,92 L 290,94 M 300,101 L 291,103 M 300,110 L 291,112 M 299,119 L 290,121 M 298,128 L 290,130 M 295,137 L 288,139"
-                      Stroke="#1B5C75" StrokeThickness="3.2" StrokeStartLineCap="Square" Opacity="0.88" />
-                <Ellipse x:Name="BasicPowerHalo" Width="244" Height="184" Fill="Transparent"
-                         Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5">
-                  <Ellipse.RenderTransform><ScaleTransform x:Name="PowerHaloScale" /></Ellipse.RenderTransform>
-                  <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="22" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
+                <Ellipse Width="252" Height="252" Stroke="#0E425B" StrokeThickness="1.5" Opacity="0.9" />
+                <Ellipse Width="236" Height="236" Stroke="#0A2C3D" StrokeThickness="13" Opacity="0.78" />
+                <Ellipse Width="216" Height="216" Stroke="#0B3549" StrokeThickness="1.4" Opacity="0.9" />
+                <Path Data="M 163,4 L 163,15 M 163,243 L 163,254 M 38,129 L 49,129 M 277,129 L 288,129"
+                      Stroke="#1B5C75" StrokeThickness="1.5" StrokeStartLineCap="Square" Opacity="0.72" />
+                <Ellipse x:Name="BasicPowerHalo" Width="208" Height="208" Fill="Transparent"
+                         Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0">
+                  <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="18" ShadowDepth="0" Opacity="0" /></Ellipse.Effect>
                 </Ellipse>
-                <Ellipse x:Name="BasicPowerOrbit" Width="226" Height="202" Fill="Transparent"
+                <Ellipse x:Name="BasicPowerOrbit" Width="228" Height="228" Fill="Transparent"
                          Stroke="{StaticResource AccentBrush}" StrokeThickness="1.8" StrokeDashArray="1.6 7.4"
                          StrokeDashCap="Round" Opacity="0" RenderTransformOrigin="0.5,0.5">
                   <Ellipse.RenderTransform><RotateTransform x:Name="PowerOrbitRotation" /></Ellipse.RenderTransform>
                   <Ellipse.Effect><DropShadowEffect Color="#12C8FF" BlurRadius="8" ShadowDepth="0" Opacity="0.55" /></Ellipse.Effect>
                 </Ellipse>
-                <Ellipse Width="206" Height="184" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0.78" />
-                <Ellipse x:Name="BasicPowerRipple" Width="206" Height="184" Fill="Transparent"
-                         Stroke="{StaticResource AccentBrush}" StrokeThickness="2.5" Opacity="0" RenderTransformOrigin="0.5,0.5">
-                  <Ellipse.RenderTransform><ScaleTransform x:Name="PowerRippleScale" /></Ellipse.RenderTransform>
-                </Ellipse>
+                <Ellipse Width="192" Height="192" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" Opacity="0.78" />
+                <Ellipse x:Name="BasicPowerRipple" Width="252" Height="252" Fill="Transparent"
+                         Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" Opacity="0" />
                 <Button x:Name="BasicConnectionButton" Click="BasicConnectionButton_Click" Width="188" Height="188"
                         Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Cursor="Hand" ToolTip="{Binding ElementName=BasicConnectionButtonText, Path=Text}"
                         AutomationProperties.Name="{Binding ElementName=BasicConnectionButtonText, Path=Text}">
                   <Button.Template>
                     <ControlTemplate TargetType="Button">
-                      <Grid x:Name="PowerSurface" RenderTransformOrigin="0.5,0.5">
-                        <Grid.RenderTransform><ScaleTransform /></Grid.RenderTransform>
+                      <Grid x:Name="PowerSurface">
                         <Ellipse x:Name="FocusRing" Stroke="#72E6FF" StrokeThickness="2" Margin="-4" Visibility="Collapsed" />
                         <ContentPresenter />
                       </Grid>
@@ -237,9 +231,7 @@
                           <Setter TargetName="PowerSurface" Property="Opacity" Value="0.88" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                          <Setter TargetName="PowerSurface" Property="RenderTransform">
-                            <Setter.Value><ScaleTransform ScaleX="0.96" ScaleY="0.96" /></Setter.Value>
-                          </Setter>
+                          <Setter TargetName="PowerSurface" Property="Opacity" Value="0.76" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                           <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
@@ -250,7 +242,11 @@
                       </ControlTemplate.Triggers>
                     </ControlTemplate>
                   </Button.Template>
-                  <Image x:Name="BasicPowerButtonFace" Width="188" Height="188" Stretch="Fill" />
+                  <Grid Width="188" Height="188">
+                    <Image x:Name="BasicPowerButtonFace" Width="188" Height="188" Stretch="Fill" />
+                    <Image x:Name="BasicPowerButtonFaceActive" Width="188" Height="188" Stretch="Fill"
+                           Opacity="0" IsHitTestVisible="False" />
+                  </Grid>
                 </Button>
               </Grid>
             </Grid>
